@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using TradingDataAnalytics.Domain;
 using TradingDataAnalytics.Domain.Enums;
 using TradingDataAnalytics.Domain.Indicators;
+using TradingDataAnalytics.Domain.Strategy;
 
 namespace TradingDataAnalytics.Application
 {

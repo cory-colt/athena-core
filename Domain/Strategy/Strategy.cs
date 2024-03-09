@@ -9,7 +9,7 @@ using TradingDataAnalytics.Domain.Helpers;
 using TradingDataAnalytics.Domain.Indicators;
 using TradingDataAnalytics.Domain.Interfaces;
 
-namespace TradingDataAnalytics.Domain
+namespace TradingDataAnalytics.Domain.Strategy
 {
     public abstract class Strategy
     {
@@ -146,11 +146,11 @@ namespace TradingDataAnalytics.Domain
         /// <param name="accountBalance">Starting account balance</param>
         /// <param name="pricePerTick">How much an executed trade is worth per-tick. MNQ = .50 cents per tick</param>
         public Strategy(
-            int timeframe, 
-            TimeOnly tradingWindowStartTime, 
-            TimeOnly tradingWindowEndTime, 
-            int contracts = 5, 
-            decimal accountBalance = 1000, 
+            int timeframe,
+            TimeOnly tradingWindowStartTime,
+            TimeOnly tradingWindowEndTime,
+            int contracts = 5,
+            decimal accountBalance = 1000,
             decimal pricePerTick = .5m)
         {
             Timeframe = timeframe;
@@ -163,7 +163,7 @@ namespace TradingDataAnalytics.Domain
             Status = StrategyStatus.OutOfTheMarket;
             Trades = new List<Trade>();
             InitialStopLoss = 20;
-            MaxTradesPerSession = 3;
+            MaxTradesPerSession = 2;
         }
         #endregion
 
@@ -187,16 +187,16 @@ namespace TradingDataAnalytics.Domain
             List<CandleStick> candles = CandleDataParser.ConvertRawDataToCandleSticks(rawCandleStickDataLines);
 
             // convert 1 minute candlesticks into the strategy's timeframe candlesticks
-            this.Candles = CandleDataParser.ConvertCandleTimeframe(candles, this.Timeframe);
+            Candles = CandleDataParser.ConvertCandleTimeframe(candles, Timeframe);
 
-            TimeSpan start = new TimeSpan(this.TradingWindowStartTime.Hour + 1, this.TradingWindowStartTime.Minute, 0);
-            TimeSpan end = new TimeSpan(this.TradingWindowEndTime.Hour + 1, 0, 0);
+            TimeSpan start = new TimeSpan(TradingWindowStartTime.Hour + 1, TradingWindowStartTime.Minute, 0);
+            TimeSpan end = new TimeSpan(TradingWindowEndTime.Hour + 1, 0, 0);
 
             // set the available trading sessions this strategy can use by filtering all the candles to only get those that are within the 
             // specified trading window start/end times
-            this.AvailableSessions = CandleDataParser.SplitCandlesIntoSessions(
-                this.Candles
-                    .Where(m => (m.TimeOfDay.TimeOfDay >= start && m.TimeOfDay.TimeOfDay <= end))
+            AvailableSessions = CandleDataParser.SplitCandlesIntoSessions(
+                Candles
+                    .Where(m => m.TimeOfDay.TimeOfDay >= start && m.TimeOfDay.TimeOfDay <= end)
                     .ToList()
                 );
 
@@ -265,7 +265,7 @@ namespace TradingDataAnalytics.Domain
                 // publish the TradeClosed event
                 OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance });
             }
-        }        
+        }
 
         /// <summary>
         /// Checks a short position to determine if a profit target has been hit
@@ -294,7 +294,7 @@ namespace TradingDataAnalytics.Domain
                 AccountBalance = newAccountBalance;
 
                 // publish the TradeClosed event
-                OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance });;
+                OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance }); ;
             }
         }
 
@@ -309,7 +309,7 @@ namespace TradingDataAnalytics.Domain
             if (candle.High >= pendingTrade?.StopLoss.OrderPrice || candle.Close >= pendingTrade?.StopLoss.OrderPrice)
             {
                 // calculate loss
-                var loss = (InitialStopLoss * 2 * pendingTrade.Contracts) * -1; // TODO: the 2 needs to be dynamic based on the asset being traded
+                var loss = InitialStopLoss * 2 * pendingTrade.Contracts * -1; // TODO: the 2 needs to be dynamic based on the asset being traded
 
                 // update the pending trade's status
                 pendingTrade.StopLoss.ClosingDate = candle.TimeOfDay;

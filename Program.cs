@@ -1,8 +1,10 @@
 ﻿using System.Linq;
+using System.Text.Json;
 using TradingDataAnalytics.Application;
 using TradingDataAnalytics.Domain;
 using TradingDataAnalytics.Domain.Enums;
 using TradingDataAnalytics.Domain.Indicators;
+using TradingDataAnalytics.Domain.Strategy;
 
 var ema = new Ema();
 var ema1LookbackPeriod = 20;
@@ -10,8 +12,16 @@ var ema2LookbackPeriod = 10;
 bool outputAllCandleData = true;
 bool showAggregatedSessionData = false;
 
-// HACK: these can probably move into the Strategy base class in the .Init() method
-string candleStickData = Path.Combine(@"I:\Windows Projects\TradingDataAnalytics", "market-data-sample.txt");
+List<StrategyConfig> strategyConfigs = new List<StrategyConfig>();
+
+using (StreamReader r = new StreamReader(Path.Combine(@"I:\Windows Projects\athena-core", "strategies.json")))
+{
+    string json = r.ReadToEnd();
+    strategyConfigs = JsonSerializer.Deserialize<List<StrategyConfig>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+}
+
+    // HACK: these can probably move into the Strategy base class in the .Init() method
+    string candleStickData = Path.Combine(@"I:\Windows Projects\athena-core", "market-data-sample.txt");
 IEnumerable<string> lines = File.ReadLines(candleStickData);
 
 // setup the strategy
@@ -22,7 +32,7 @@ PriceExtremeStrategy strategy = new PriceExtremeStrategy(
     50,
     10000);
 strategy.Name = "Price Extreme Strategy";
-strategy.MaxTradesPerSession = 3;
+strategy.MaxTradesPerSession = 2;
 
 // subscrbe to strategy events
 strategy.TradeClosed += Strategy_TradeClosed;

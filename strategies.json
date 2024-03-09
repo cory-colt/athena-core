@@ -1,0 +1,43 @@
+[
+  {
+    "id": "87b5c4e4-ba29-4a94-bc52-ed6323d64514",
+    "name": "Price Extreme Strategy",
+    "description": "Takes a contrarian trade when the price is trading at an extreme and enters at the close of the extreme candle",
+    "pricePerTick": 0.5,
+    "timeframe": 3,
+    "tradingWindowStartTime": {
+      "hour": 7,
+      "minute": 30
+    },
+    "tradingWindowEndTime": {
+      "hour": 9,
+      "minute": 0
+    },
+    "startingAccountBalance": 1000,
+    "maxTradesPerSession": 3,
+    "stopTradingAfterWinning": true,
+    "executionSettings": {
+      "contracts": 5,
+      "initialStopLoss": 20,
+      "trailStopToBreakeven": false,
+      "trailStopTrigger": 20,
+      "profitTargets": [
+        {
+          "profitTargetPrice": 10,
+          "contracts": 3,
+          "stop": 0
+        },
+        {
+          "profitTargetPrice": 20,
+          "contracts": 1,
+          "stop": 20
+        },
+        {
+          "profitTargetPrice": 30,
+          "contracts": 1,
+          "stop": 0
+        }
+      ]
+    }
+  }
+]
