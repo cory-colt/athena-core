@@ -24,6 +24,11 @@ namespace TradingDataAnalytics.Domain.Strategy
         /// TradeClosed is fired when a trade is closed. See <see cref="TradeClosedEventArgs"/> for more details.
         /// </summary>
         public event EventHandler<TradeClosedEventArgs> TradeClosed;
+
+        /// <summary>
+        /// ProfitTargetHit is fired every time a profit target is hit. See <see cref="ProfitTargetHitEventArgs"/> for more details
+        /// </summary>
+        public event EventHandler<ProfitTargetHitEventArgs> ProfitTargetHit;
         #endregion
 
         #region public properties
@@ -90,6 +95,9 @@ namespace TradingDataAnalytics.Domain.Strategy
         /// </summary>
         public decimal AccountBalance { get; set; }
 
+        /// <summary>
+        /// Sets the initial account balance
+        /// </summary>
         public decimal InitialAccountBalance { get; set; }
 
         /// <summary>
@@ -301,26 +309,26 @@ namespace TradingDataAnalytics.Domain.Strategy
 
         public void CheckLongForProfitTarget(Trade pendingTrade, CandleStick candle)
         {
-            // check if a profit target was hit
-            if (candle.High >= pendingTrade.ProfitTarget?.OrderPrice || candle.Close >= pendingTrade.ProfitTarget?.OrderPrice)
+            foreach (var profitTargetOrder in pendingTrade.ProfitTargets.Where(m => m.ClosingDate == null))
             {
-                // calculate profit
-                var profit = 20 * (this.PricePerTick * 4) * pendingTrade.Contracts; // TODO: 20 needs to be dynamic - 20 is PT points
-
-                // update the pending trade's status
-                pendingTrade.Profit = profit;
-                pendingTrade.ProfitTarget.ClosingDate = candle.TimeOfDay;
-                pendingTrade.Outcome = TradeOutcome.Win;
-
                 var oldAccountBalance = AccountBalance;
-                var newAccountBalance = AccountBalance += profit;
 
-                // update the strategy
-                this.TotalProfit += profit;
-                this.AccountBalance = newAccountBalance;
+                // check if a profit target was hit
+                if (candle.High >= profitTargetOrder.OrderPrice || candle.Close >= profitTargetOrder.OrderPrice)
+                {
+                    // pt hit - process it
+                    ProcessProfitTargetHit(profitTargetOrder, pendingTrade, candle);
+                }
 
-                // publish the TradeClosed event
-                OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance });
+                // check if there are any outstanding contracts to close, if not, close the trade out
+                if (pendingTrade.Contracts <= 0)
+                {
+                    // update the pending trade's status
+                    pendingTrade.Outcome = TradeOutcome.Win;
+
+                    // publish the TradeClosed event
+                    OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = this.AccountBalance }); ;
+                }
             }
         }
 
@@ -356,27 +364,25 @@ namespace TradingDataAnalytics.Domain.Strategy
         /// <param name="candle">Current <see cref="CandleStick"/> to compare to the profit target order with</param>
         public void CheckShortForProfitTarget(Trade pendingTrade, CandleStick candle)
         {
-            // check if a profit target was hit
-            if (candle.Low <= pendingTrade.ProfitTarget?.OrderPrice || candle.Close <= pendingTrade.ProfitTarget?.OrderPrice)
+            foreach (var profitTargetOrder in  pendingTrade.ProfitTargets.Where(m => m.ClosingDate == null))
             {
-                // calculate profit
-                // TODO: 20 needs to be dynamic - 20 is PT points
-                var profit = 20 * (this.PricePerTick * 4) * pendingTrade.Contracts;
-
-                // update the pending trade's status
-                pendingTrade.Profit = profit;
-                pendingTrade.ProfitTarget.ClosingDate = candle.TimeOfDay;
-                pendingTrade.Outcome = TradeOutcome.Win;
-
                 var oldAccountBalance = AccountBalance;
-                var newAccountBalance = AccountBalance += profit;
 
-                // update the strategy metrics
-                this.TotalProfit += profit;
-                this.AccountBalance = newAccountBalance;
+                // check if a profit target was hit
+                if (candle.Low <= profitTargetOrder.OrderPrice || candle.Close <= profitTargetOrder.OrderPrice)
+                {
+                    ProcessProfitTargetHit(profitTargetOrder, pendingTrade, candle);
+                }
 
-                // publish the TradeClosed event
-                OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance }); ;
+                // check if there are any outstanding contracts to close, if not, close the trade out
+                if (pendingTrade.Contracts <= 0)
+                {
+                    // update the pending trade's status
+                    pendingTrade.Outcome = TradeOutcome.Win;
+
+                    // publish the TradeClosed event
+                    OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = this.AccountBalance }); ;
+                }
             }
         }
 
@@ -408,6 +414,28 @@ namespace TradingDataAnalytics.Domain.Strategy
                 // publish the TradeClosed event
                 OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance });
             }
+        }
+        #endregion
+
+        #region private methods
+        private void ProcessProfitTargetHit(Order profitTargetOrder, Trade pendingTrade, CandleStick candle)
+        {
+            // calculate profit for this profit target
+            var profit = Math.Abs(profitTargetOrder.OrderPrice - pendingTrade.InitialEntryPrice) * (this.PricePerTick * 4) * profitTargetOrder.Contracts;
+
+            // update the outstanding contracts and profit for the pending trade
+            pendingTrade.Contracts -= profitTargetOrder.Contracts;
+            pendingTrade.Profit += profit;
+
+            // set the closing date for this profit target
+            profitTargetOrder.ClosingDate = candle.TimeOfDay;
+
+            // update the strategy's metrics
+            this.AccountBalance += profit;
+            this.TotalProfit += profit;
+
+            // publish the ProfitTargetHit event
+            OnProfitTargetHit(new ProfitTargetHitEventArgs { ProfitTargetOrder = profitTargetOrder, Profit = profit, Outcome = TradeOutcome.Win });
         }
         #endregion
 
@@ -459,6 +487,11 @@ namespace TradingDataAnalytics.Domain.Strategy
             Status = StrategyStatus.OutOfTheMarket;
 
             TradeClosed?.Invoke(this, args);
+        }
+
+        public virtual void OnProfitTargetHit(ProfitTargetHitEventArgs args)
+        {
+            ProfitTargetHit?.Invoke(this, args);
         }
         #endregion
 
