@@ -9,10 +9,6 @@ namespace TradingDataAnalytics.Domain.Events
 {
     public class TradeCreatedEventArgs : EventArgs
     {
-        public DateTime DateCreated { get; set; }
-
-        public decimal EntryPrice { get; set; }
-
-        public TradeDirection Direction { get; set; }
+        public Trade TradeCreated { get; set; }
     }
 }

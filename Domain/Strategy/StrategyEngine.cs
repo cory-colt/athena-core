@@ -65,15 +65,17 @@ namespace TradingDataAnalytics.Domain.Strategy
 
                     // subscrbe to strategy events
                     strategy.TradeClosed += Strategy_TradeClosed;
+                    strategy.TradeCreated += Strategy_TradeCreated;
 
                     StartLookingForTradeOpportunities(strategy);
                     
                     // unsubscribe from the events
                     strategy.TradeClosed -= Strategy_TradeClosed;
+                    strategy.TradeCreated -= Strategy_TradeCreated;
                 }
-            }
-            
+            }            
         }
+        
         #endregion
 
         #region event handlers
@@ -81,17 +83,27 @@ namespace TradingDataAnalytics.Domain.Strategy
         {
             var dateClosed = e.ClosedTrade.Outcome == TradeOutcome.Loss ? e.ClosedTrade.StopLoss?.ClosingDate : e.ClosedTrade.ProfitTarget?.ClosingDate;
             var closingPrice = e.ClosedTrade.Outcome == TradeOutcome.Loss ? e.ClosedTrade.StopLoss?.OrderPrice : e.ClosedTrade.ProfitTarget?.OrderPrice;
+            
             Console.WriteLine(string.Format("{0, 12} | {1,20} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}",
-                            e.ClosedTrade.Id.ToString().Substring(0, 7),
-                            dateClosed,
-                            "-",
-                            "-", /*e.ClosedTrade.InitialEntryPrice*/
-                            closingPrice,
-                            string.Format("{0:C}", e.ClosedTrade.Profit),
-                            e.ClosedTrade.Outcome));
+                e.ClosedTrade.Id.ToString().Substring(0, 7),
+                dateClosed,
+                "-",
+                "-",
+                closingPrice,
+                string.Format("{0:C}", e.ClosedTrade.Profit),
+                e.ClosedTrade.Outcome));
+        }
 
-            //Console.WriteLine($"Trade Closed at {dateClosed}...{e.OldAccountBalance} {e.NewAccountBalance} {e.ClosedTrade.Outcome} {e.ClosedTrade.Profit}");
-            //Console.WriteLine();
+        private void Strategy_TradeCreated(object? sender, Events.TradeCreatedEventArgs e)
+        {
+            Console.WriteLine(string.Format("{0, 12} | {1,20} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}",
+                e.TradeCreated.Id.ToString().Substring(0, 7),
+                e.TradeCreated.ProfitTarget?.OpeningDate,
+                e.TradeCreated.TradeDirection,
+                e.TradeCreated.InitialEntryPrice,
+                e.TradeCreated.StopLoss?.OrderPrice,
+                "-",
+                "-"));
         }
         #endregion
 
@@ -99,10 +111,8 @@ namespace TradingDataAnalytics.Domain.Strategy
 
         private void StartLookingForTradeOpportunities(Strategy strategy)
         {
-            Console.WriteLine($"Executing Strategy: [{strategy.Name}] - Starting Account Balance: [{strategy.AccountBalance}]");
-            Console.WriteLine("---------------------------------------------------------------------------------------------------------------");
-            Console.WriteLine(string.Format("{0, 12} | {1, 20} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}", "Id", "Date", "Direction", "Entry Price", "Closing Price", "P/L", "Outcome"));
-            Console.WriteLine("---------------------------------------------------------------------------------------------------------------");
+            // write the beginning strategy header to the console
+            WriteStrategyHeaderToConsole(strategy);
 
             // iterate over each tradable session and execute the strategy
             foreach (var session in strategy.AvailableSessions)
@@ -119,102 +129,63 @@ namespace TradingDataAnalytics.Domain.Strategy
                     }
 
                     // check if there are any trades, if so see if they're a winning trade so we can exit this session without taking any additional trades
-                    if (strategy.Trades?.Where(m => m.Outcome == TradeOutcome.Win && m.DateInitiated.ToShortDateString() == session.Key).Count() > 0)
-                        break;
+                    if (strategy.StopTradingAfterWinning)
+                        if (strategy.Trades?.Where(m => m.Outcome == TradeOutcome.Win && m.DateInitiated.ToShortDateString() == session.Key).Count() > 0)
+                            break;
 
                     // we're out of the market - check for long entry conditions
                     if (strategy.LongEntryCondition(candle) && sessionTradeCount < strategy.MaxTradesPerSession)
                     {
-                        strategy.ExecuteTrade(new Trade
-                        {
-                            Id = Guid.NewGuid(),
-                            InitialEntryPrice = candle.Close,
-                            Contracts = strategy.Contracts,
-                            DateInitiated = candle.TimeOfDay,
-                            Outcome = TradeOutcome.Pending,
-                            TradeDirection = TradeDirection.Long,
-                            StopLoss = new Order
-                            {
-                                Id = Guid.NewGuid(),
-                                OpeningDate = candle.TimeOfDay,
-                                OrderDirection = TradeDirection.StopLoss,
-                                OrderPrice = candle.Close - 30
-                            },
-                            ProfitTarget = new Order
-                            {
-                                Id = Guid.NewGuid(),
-                                OpeningDate = candle.TimeOfDay,
-                                OrderDirection = TradeDirection.Long,
-                                OrderPrice = candle.Close + 10
-                            }
-                        });
+                        var longTrade = CreateTrade(candle, strategy, TradeDirection.Long);
 
-                        Console.WriteLine(string.Format("{0, 12} | {1,20} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}",
-                            strategy.Trades?.Last().Id.ToString().Substring(0, 7),
-                            candle.TimeOfDay,
-                            strategy.Trades?.Last().TradeDirection,
-                            strategy.Trades?.Last().InitialEntryPrice,
-                            strategy.Trades?.Last().StopLoss?.OrderPrice, 
-                            "-", 
-                            "-"));
+                        // execute the trade
+                        strategy.ExecuteTrade(longTrade);
+
+                        sessionTradeCount++;
                     }
 
                     if (strategy.ShortEntryCondition(candle) && sessionTradeCount < strategy.MaxTradesPerSession)
                     {
                         // setup the short trade
-                        var shortTrade = new Trade
-                        {
-                            Id = Guid.NewGuid(),
-                            InitialEntryPrice = candle.Close,
-                            Contracts = strategy.Contracts,
-                            DateInitiated = candle.TimeOfDay,
-                            Outcome = TradeOutcome.Pending,
-                            TradeDirection = TradeDirection.Short,
-                            StopLoss = new Order
-                            {
-                                Id = Guid.NewGuid(),
-                                OpeningDate = candle.TimeOfDay,
-                                OrderDirection = TradeDirection.StopLoss,
-                                OrderPrice = candle.Close + 30
-                            },
-                            ProfitTarget = new Order
-                            {
-                                Id = Guid.NewGuid(),
-                                OpeningDate = candle.TimeOfDay,
-                                OrderDirection = TradeDirection.Short,
-                                OrderPrice = candle.Close - 10
-                            }
-                        };
+                        var shortTrade = CreateTrade(candle, strategy, TradeDirection.Short);
 
                         // execute the trade
                         strategy.ExecuteTrade(shortTrade);
 
                         sessionTradeCount++;
-
-                        Console.WriteLine(string.Format("{0, 12} | {1,20} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}",
-                            shortTrade.Id.ToString().Substring(0, 7),
-                            candle.TimeOfDay,
-                            shortTrade.TradeDirection,
-                            shortTrade.InitialEntryPrice,
-                            shortTrade.StopLoss?.OrderPrice,
-                            "-", 
-                            "-"));
-
-                        // Console.WriteLine($"Short Trade Executed: [{candle.TimeOfDay}] Entry Price: [{shortTrade.InitialEntryPrice}] Stop Loss: [{shortTrade.StopLoss.OrderPrice}]");
                     }
                 }
             }
 
-            Console.WriteLine($"---------------------- STRATEGY SUMMARY STATISTICS --------------------------");
-            Console.WriteLine();
+            // output strategy summary to the console
+            WriteSummaryToConsole(strategy);
+        }
 
-            Console.WriteLine($"Gain on Account: {strategy.AccountBalance - strategy.InitialAccountBalance} ({(strategy.AccountBalance - strategy.InitialAccountBalance) / strategy.InitialAccountBalance * 100}%) - Total Trades: {strategy.Trades.Count}");
-            var losses = Convert.ToDecimal(strategy.Trades.Where(m => m.Outcome == TradeOutcome.Loss).Count());
-            var wins = Convert.ToDecimal(strategy.Trades.Where(m => m.Outcome == TradeOutcome.Win).Count());
-            var totalTrades = Convert.ToDecimal(strategy.Trades.Count);
-            var winRate = Convert.ToDecimal(wins / totalTrades * 100);
-            Console.WriteLine(string.Format("{0,10} | {1,10} | {2, 10}", "Wins", "Losses", "Win-Rate"));
-            Console.WriteLine(string.Format("{0,10} | {1,10} | {2, 10}%", wins, losses, winRate.ToString("0.00")));
+        private Trade CreateTrade(CandleStick candle, Strategy strategy, TradeDirection direction)
+        {
+            return new Trade
+            {
+                Id = Guid.NewGuid(),
+                InitialEntryPrice = candle.Close,
+                Contracts = strategy.Contracts,
+                DateInitiated = candle.TimeOfDay,
+                Outcome = TradeOutcome.Pending,
+                TradeDirection = (direction == TradeDirection.Long) ? TradeDirection.Long : TradeDirection.Short,
+                StopLoss = new Order
+                {
+                    Id = Guid.NewGuid(),
+                    OpeningDate = candle.TimeOfDay,
+                    OrderDirection = TradeDirection.StopLoss,
+                    OrderPrice = (direction == TradeDirection.Long) ? candle.Close - strategy.InitialStopLoss : candle.Close + strategy.InitialStopLoss
+                },
+                ProfitTarget = new Order
+                {
+                    Id = Guid.NewGuid(),
+                    OpeningDate = candle.TimeOfDay,
+                    OrderDirection = (direction == TradeDirection.Long) ? TradeDirection.Long : TradeDirection.Short,
+                    OrderPrice = (direction == TradeDirection.Long) ? candle.Close + 30 : candle.Close - 30 // TODO: profit targets need to retrieved based on the strategies.json
+                }
+            };
         }
 
         /// <summary>
@@ -231,6 +202,28 @@ namespace TradingDataAnalytics.Domain.Strategy
 
                 return configs;
             }
+        }
+
+        private void WriteStrategyHeaderToConsole(Strategy strategy)
+        {
+            Console.WriteLine($"Executing Strategy: [{strategy.Name}] - Starting Account Balance: [{strategy.AccountBalance}]");
+            Console.WriteLine("---------------------------------------------------------------------------------------------------------------");
+            Console.WriteLine(string.Format("{0, 12} | {1, 20} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}", "Id", "Date", "Direction", "Entry Price", "Closing Price", "P/L", "Outcome"));
+            Console.WriteLine("---------------------------------------------------------------------------------------------------------------");
+        }
+
+        private static void WriteSummaryToConsole(Strategy strategy)
+        {
+            Console.WriteLine($"---------------------- STRATEGY SUMMARY STATISTICS --------------------------");
+            Console.WriteLine();
+
+            Console.WriteLine($"Gain on Account: {strategy.AccountBalance - strategy.InitialAccountBalance} ({(strategy.AccountBalance - strategy.InitialAccountBalance) / strategy.InitialAccountBalance * 100}%) - Total Trades: {strategy.Trades.Count}");
+            var losses = Convert.ToDecimal(strategy.Trades.Where(m => m.Outcome == TradeOutcome.Loss).Count());
+            var wins = Convert.ToDecimal(strategy.Trades.Where(m => m.Outcome == TradeOutcome.Win).Count());
+            var totalTrades = Convert.ToDecimal(strategy.Trades.Count);
+            var winRate = Convert.ToDecimal(wins / totalTrades * 100);
+            Console.WriteLine(string.Format("{0,10} | {1,10} | {2, 10}", "Wins", "Losses", "Win-Rate"));
+            Console.WriteLine(string.Format("{0,10} | {1,10} | {2, 10}%", wins, losses, winRate.ToString("0.00")));
         }
         #endregion
     }

@@ -123,6 +123,30 @@ namespace TradingDataAnalytics.Domain.Strategy
         public int MaxTradesPerSession { get; set; }
 
         /// <summary>
+        /// Determines if no more trades should be taken during a session as soon as there is a winning/profitable trade. Default is false.
+        /// </summary>
+        public bool StopTradingAfterWinning { get; set; } = false;
+
+        /// <summary>
+        /// Determines if a stop can be trailed to breakeven based on the TrailStopTrigger
+        /// </summary>
+        public bool TrailStopToBreakeven { get; set; } = false;
+
+        /// <summary>
+        /// Trigger price (in points) for when the stop should be moved to breakeven. This only works if TrailStopToBreakEven = true
+        /// </summary>
+        public int TrailStopTrigger { get; set; }
+
+        /// <summary>
+        /// Collection of profit targets used for scaling out of a trade. See <see cref="StrategyProfitTarget"/> for more details
+        /// <para>
+        ///     Each profit target is comprised of an exit price, number of contracts to be closed at this price, 
+        ///     and an optional stop price to move the stoploss to once the profit target has been hit
+        /// </para>
+        /// </summary>
+        public List<StrategyProfitTarget> ProfitTargets { get; set; } = new List<StrategyProfitTarget>();
+
+        /// <summary>
         /// Collection of timeframe specific <see cref="CandleStick"/> objects used for executing this strategy.
         /// </summary>
         public List<CandleStick> Candles { get; set; }
@@ -224,8 +248,8 @@ namespace TradingDataAnalytics.Domain.Strategy
             // convert 1 minute candlesticks into the strategy's timeframe candlesticks
             Candles = CandleDataParser.ConvertCandleTimeframe(candles, Timeframe);
 
-            TimeSpan start = new TimeSpan(TradingWindowStartTime.Hour + 1, TradingWindowStartTime.Minute, 0);
-            TimeSpan end = new TimeSpan(TradingWindowEndTime.Hour + 1, 0, 0);
+            TimeSpan start = new TimeSpan(TradingWindowStartTime.Hour, TradingWindowStartTime.Minute, 0);
+            TimeSpan end = new TimeSpan(TradingWindowEndTime.Hour, 0, 0);
 
             // set the available trading sessions this strategy can use by filtering all the candles to only get those that are within the 
             // specified trading window start/end times
@@ -251,6 +275,10 @@ namespace TradingDataAnalytics.Domain.Strategy
             this.Description = config.Description;
             this.MaxTradesPerSession = config.MaxTradesPerSession;
             this.Timeframe = config.Timeframe;
+            this.StopTradingAfterWinning = config.StopTradingAfterWinning;
+            this.TrailStopToBreakeven = config.ExecutionSettings.TrailStopToBreakeven;
+            this.TrailStopTrigger = config.ExecutionSettings.TrailStopTrigger;
+            this.ProfitTargets = config.ExecutionSettings.ProfitTargets;
             this.TradingWindowEndTime = new TimeOnly(config.TradingWindowEndTime.Hour + 2, config.TradingWindowEndTime.Minute); // + 2 is because the candle data is in EST, not MST
             this.TradingWindowStartTime = new TimeOnly(config.TradingWindowStartTime.Hour + 2, config.TradingWindowStartTime.Minute); // + 2 is because the candle data is in EST, not MST
 
@@ -271,38 +299,13 @@ namespace TradingDataAnalytics.Domain.Strategy
             CheckShortForProfitTarget(pendingTrade, candle);
         }
 
-        public void CheckLongForStopLoss(Trade pendingTrade, CandleStick candle)
-        {
-            // check if stop-loss was hit
-            if (candle.Low <= pendingTrade?.StopLoss.OrderPrice || candle.Close <= pendingTrade?.StopLoss.OrderPrice)
-            {
-                // calculate loss
-                var loss = 20 * 2 * pendingTrade.Contracts * -1; // TODO: the 2 needs to be dynamic based on the asset being traded
-
-                // update the pending trade's status
-                pendingTrade.StopLoss.ClosingDate = candle.TimeOfDay;
-                pendingTrade.Outcome = TradeOutcome.Loss;
-                pendingTrade.Profit = loss;
-
-                var oldAccountBalance = AccountBalance;
-                var newAccountBalance = AccountBalance += loss;
-
-                // calculate stop loss
-                TotalLosses += loss;
-                AccountBalance = newAccountBalance;
-
-                // publish the TradeClosed event
-                OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance });
-            }
-        }
-
         public void CheckLongForProfitTarget(Trade pendingTrade, CandleStick candle)
         {
             // check if a profit target was hit
-            if (candle.High >= pendingTrade?.ProfitTarget.OrderPrice || candle.Close >= pendingTrade?.ProfitTarget.OrderPrice)
+            if (candle.High >= pendingTrade.ProfitTarget?.OrderPrice || candle.Close >= pendingTrade.ProfitTarget?.OrderPrice)
             {
                 // calculate profit
-                var profit = 20 * 2 * pendingTrade.Contracts; // TODO: 20 and 2 needs to be dynamic - 20 is PT points and 2 is the multiplier for the asset being traded (MNQ or NQ)
+                var profit = 20 * (this.PricePerTick * 4) * pendingTrade.Contracts; // TODO: 20 needs to be dynamic - 20 is PT points
 
                 // update the pending trade's status
                 pendingTrade.Profit = profit;
@@ -313,8 +316,33 @@ namespace TradingDataAnalytics.Domain.Strategy
                 var newAccountBalance = AccountBalance += profit;
 
                 // update the strategy
-                TotalProfit += profit;
-                AccountBalance = newAccountBalance;
+                this.TotalProfit += profit;
+                this.AccountBalance = newAccountBalance;
+
+                // publish the TradeClosed event
+                OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance });
+            }
+        }
+
+        public void CheckLongForStopLoss(Trade pendingTrade, CandleStick candle)
+        {
+            // check if stop-loss was hit
+            if (candle.Low <= pendingTrade.StopLoss?.OrderPrice || candle.Close <= pendingTrade.StopLoss?.OrderPrice)
+            {
+                // calculate loss
+                var loss = this.InitialStopLoss * (this.PricePerTick * 4) * pendingTrade.Contracts * -1;
+
+                // update the pending trade's status
+                pendingTrade.StopLoss.ClosingDate = candle.TimeOfDay;
+                pendingTrade.Outcome = TradeOutcome.Loss;
+                pendingTrade.Profit = loss;
+
+                var oldAccountBalance = AccountBalance;
+                var newAccountBalance = AccountBalance += loss;
+
+                // calculate stop loss
+                this.TotalLosses += loss;
+                this.AccountBalance = newAccountBalance;
 
                 // publish the TradeClosed event
                 OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance });
@@ -329,11 +357,11 @@ namespace TradingDataAnalytics.Domain.Strategy
         public void CheckShortForProfitTarget(Trade pendingTrade, CandleStick candle)
         {
             // check if a profit target was hit
-            if (candle.Low <= pendingTrade?.ProfitTarget?.OrderPrice || candle.Close <= pendingTrade?.ProfitTarget?.OrderPrice)
+            if (candle.Low <= pendingTrade.ProfitTarget?.OrderPrice || candle.Close <= pendingTrade.ProfitTarget?.OrderPrice)
             {
                 // calculate profit
-                // TODO: 20 and 2 needs to be dynamic - 20 is PT points and 2 is the multiplier for the asset being traded (MNQ or NQ)
-                var profit = 20 * 2 * pendingTrade.Contracts;
+                // TODO: 20 needs to be dynamic - 20 is PT points
+                var profit = 20 * (this.PricePerTick * 4) * pendingTrade.Contracts;
 
                 // update the pending trade's status
                 pendingTrade.Profit = profit;
@@ -344,8 +372,8 @@ namespace TradingDataAnalytics.Domain.Strategy
                 var newAccountBalance = AccountBalance += profit;
 
                 // update the strategy metrics
-                TotalProfit += profit;
-                AccountBalance = newAccountBalance;
+                this.TotalProfit += profit;
+                this.AccountBalance = newAccountBalance;
 
                 // publish the TradeClosed event
                 OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance }); ;
@@ -360,10 +388,10 @@ namespace TradingDataAnalytics.Domain.Strategy
         public void CheckShortForStopLoss(Trade pendingTrade, CandleStick candle)
         {
             // check if stop-loss was hit
-            if (candle.High >= pendingTrade?.StopLoss.OrderPrice || candle.Close >= pendingTrade?.StopLoss.OrderPrice)
+            if (candle.High >= pendingTrade.StopLoss?.OrderPrice || candle.Close >= pendingTrade.StopLoss?.OrderPrice)
             {
                 // calculate loss
-                var loss = InitialStopLoss * 2 * pendingTrade.Contracts * -1; // TODO: the 2 needs to be dynamic based on the asset being traded
+                var loss = this.InitialStopLoss * (this.PricePerTick * 4) * pendingTrade.Contracts * -1;
 
                 // update the pending trade's status
                 pendingTrade.StopLoss.ClosingDate = candle.TimeOfDay;
@@ -374,8 +402,8 @@ namespace TradingDataAnalytics.Domain.Strategy
                 var newAccountBalance = AccountBalance += loss;
 
                 // update the strategy metrics
-                TotalLosses += loss;
-                AccountBalance = newAccountBalance;
+                this.TotalLosses += loss;
+                this.AccountBalance = newAccountBalance;
 
                 // publish the TradeClosed event
                 OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance });
@@ -409,16 +437,19 @@ namespace TradingDataAnalytics.Domain.Strategy
 
         public virtual void ExecuteTrade(Trade trade)
         {
-            // change the status so more than one trade isn't being taken at a time
-            Status = StrategyStatus.InTheMarket;
-
             // add the trade to the collection of trades
             Trades?.Add(trade);
+
+            // publish the TradeCreated event
+            OnTradeCreated(new TradeCreatedEventArgs { TradeCreated = trade });
         }
 
         #region event handlers
         public virtual void OnTradeCreated(TradeCreatedEventArgs args)
         {
+            // change the status so more than one trade isn't being taken at a time
+            Status = StrategyStatus.InTheMarket;
+
             TradeCreated?.Invoke(this, args);
         }
 
@@ -449,6 +480,9 @@ namespace TradingDataAnalytics.Domain.Strategy
         /// <returns>True if a long entry should be executed</returns>
         public abstract bool LongEntryCondition(CandleStick candle);
 
+        /// <summary>
+        /// Allows derived classes to implement their own custom logic such as adding moving averages or other indicators
+        /// </summary>
         public abstract void LoadCustomStrategyStuff();
         #endregion
     }

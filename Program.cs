@@ -1,13 +1,13 @@
 ﻿using TradingDataAnalytics.Application;
 using TradingDataAnalytics.Domain.Strategy;
 
-
+// change the appearance of the console 
 Console.BackgroundColor = ConsoleColor.Gray;
 Console.Clear();
 Console.ForegroundColor = ConsoleColor.Black;
 
-// HACK: these can probably move into the Strategy base class in the .Init() method
-string candleStickDataFile = Path.Combine(@"I:\Windows Projects\athena-core", "market-data-sample.txt");
+
+var candleStickDataFile = Path.Combine(@"I:\Windows Projects\athena-core", "market-data-sample.txt");
 var strategiesConfigFile = Path.Combine(@"I:\Windows Projects\athena-core", "strategies.json");
 
 // setup the strategies that will be tested
