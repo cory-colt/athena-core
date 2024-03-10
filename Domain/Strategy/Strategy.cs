@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -29,7 +30,7 @@ namespace TradingDataAnalytics.Domain.Strategy
         /// <summary>
         /// Internal unique identifier for the strategy
         /// </summary>
-        public int Id { get; set; }
+        public Guid Id { get; set; }
 
         /// <summary>
         /// Name of the strategy
@@ -127,6 +128,11 @@ namespace TradingDataAnalytics.Domain.Strategy
         public List<CandleStick> Candles { get; set; }
 
         /// <summary>
+        /// <see cref="StrategyConfig"/> being used while executing this strategy
+        /// </summary>
+        public StrategyConfig StrategyConfig { get; set; }
+
+        /// <summary>
         /// Avaialble <see cref="TradingSession"/>'s for the strategy to test against
         /// <para>
         ///     A session is grouped by date and contains its own collection of <see cref="CandleStick"/>'s for the specified trading window
@@ -165,6 +171,35 @@ namespace TradingDataAnalytics.Domain.Strategy
             InitialStopLoss = 20;
             MaxTradesPerSession = 2;
         }
+
+        /// <summary>
+        /// Instantiates a new Strategy with a <see cref="StrategyConfig"/>
+        /// </summary>
+        /// <param name="config"><see cref="StrategyConfig"/> object to use when setting all the properties</param>
+        public Strategy(StrategyConfig config)
+        {
+            StrategyConfig = config;
+            Timeframe = config.Timeframe;
+            TradingWindowStartTime = new TimeOnly(config.TradingWindowStartTime.Hour, config.TradingWindowStartTime.Minute);
+            TradingWindowEndTime = new TimeOnly(config.TradingWindowEndTime.Hour, config.TradingWindowEndTime.Minute); ;
+            Contracts = config.ExecutionSettings.Contracts;
+            AccountBalance = config.StartingAccountBalance;
+            InitialAccountBalance = config.StartingAccountBalance;
+            PricePerTick = config.PricePerTick;
+            Status = StrategyStatus.OutOfTheMarket;
+            Trades = new List<Trade>();
+            InitialStopLoss = config.ExecutionSettings.InitialStopLoss;
+            MaxTradesPerSession = config.MaxTradesPerSession;
+        }
+
+        /// <summary>
+        /// Default constructor
+        /// </summary>
+        public Strategy()
+        {
+            Status = StrategyStatus.OutOfTheMarket;
+            Trades = new List<Trade>();
+        }
         #endregion
 
         #region public methods
@@ -181,7 +216,7 @@ namespace TradingDataAnalytics.Domain.Strategy
         /// </para>
         /// </summary>
         /// <param name="rawCandleStickDataLines"></param>
-        public void Init(IEnumerable<string> rawCandleStickDataLines)
+        public Strategy ParseCandleData(IEnumerable<string> rawCandleStickDataLines)
         {
             // convert raw data to 1 minute candlesticks (raw data is a csv of 1 minute candle data)
             List<CandleStick> candles = CandleDataParser.ConvertRawDataToCandleSticks(rawCandleStickDataLines);
@@ -200,7 +235,26 @@ namespace TradingDataAnalytics.Domain.Strategy
                     .ToList()
                 );
 
-            // .Where(m => (m.TimeOfDay.TimeOfDay >= start && m.TimeOfDay <= end.Hour >= this.TradingWindowStartTime.Hour + 1) && (m.TimeOfDay.Hour < this.TradingWindowEndTime.Hour + 1))
+            return this;
+        }
+
+        public Strategy LoadConfiguration(StrategyConfig config)
+        {
+            this.Id = config.Id;
+            this.InitialAccountBalance = config.StartingAccountBalance;
+            this.InitialStopLoss = config.ExecutionSettings.InitialStopLoss;
+            this.AccountBalance = config.StartingAccountBalance;
+            this.Contracts = config.ExecutionSettings.Contracts;
+            this.StrategyConfig = config;
+            this.PricePerTick = config.PricePerTick;
+            this.Name = config.Name;
+            this.Description = config.Description;
+            this.MaxTradesPerSession = config.MaxTradesPerSession;
+            this.Timeframe = config.Timeframe;
+            this.TradingWindowEndTime = new TimeOnly(config.TradingWindowEndTime.Hour + 2, config.TradingWindowEndTime.Minute); // + 2 is because the candle data is in EST, not MST
+            this.TradingWindowStartTime = new TimeOnly(config.TradingWindowStartTime.Hour + 2, config.TradingWindowStartTime.Minute); // + 2 is because the candle data is in EST, not MST
+
+            return this;
         }
 
         public void CheckLongPosition(Trade pendingTrade, CandleStick candle)
@@ -341,13 +395,13 @@ namespace TradingDataAnalytics.Domain.Strategy
             var pendingTrade = Trades?.Where(m => m.Outcome == TradeOutcome.Pending).FirstOrDefault();
 
             // check if we're long
-            if (pendingTrade?.TradeDirection == Direction.Long)
+            if (pendingTrade?.TradeDirection == TradeDirection.Long)
             {
                 CheckLongPosition(pendingTrade, candle);
             }
 
             // check if we're short
-            if (pendingTrade?.TradeDirection == Direction.Short)
+            if (pendingTrade?.TradeDirection == TradeDirection.Short)
             {
                 CheckShortPosition(pendingTrade, candle);
             }
@@ -394,6 +448,8 @@ namespace TradingDataAnalytics.Domain.Strategy
         /// <param name="candle"><see cref="CandleStick"/> containing the data to be evaluated for a long entry condition</param>
         /// <returns>True if a long entry should be executed</returns>
         public abstract bool LongEntryCondition(CandleStick candle);
+
+        public abstract void LoadCustomStrategyStuff();
         #endregion
     }
 }

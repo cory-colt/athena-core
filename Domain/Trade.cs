@@ -42,7 +42,7 @@ namespace TradingDataAnalytics.Domain
         /// <summary>
         /// Gets or sets the direction of the trade (i.e. long or short)
         /// </summary>
-        public Direction TradeDirection { get; set; }
+        public TradeDirection TradeDirection { get; set; }
 
         /// <summary>
         /// Limit price for the stoploss order

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using TradingDataAnalytics.Domain;
 using TradingDataAnalytics.Domain.Enums;
 using TradingDataAnalytics.Domain.Indicators;
+using TradingDataAnalytics.Domain.Interfaces;
 using TradingDataAnalytics.Domain.Strategy;
 
 namespace TradingDataAnalytics.Application
@@ -17,34 +18,18 @@ namespace TradingDataAnalytics.Application
         #endregion
 
         #region constructors
-        /// <summary>
-        /// Instantiates a new PriceExtremeStrategy with minimal information
-        /// </summary>
-        /// <param name="timeframe">Timeframe the strategy will be tested against in minutes. (i.e. 3 = 3 minute timeframe; 5 = 5 minute timeframe, etc)</param>
-        /// <param name="tradingWindowStartTime">Starting time for the trade execution window. This is a window of time when trades are allowed to be executed during any given session</param>
-        /// <param name="tradingWindowEndTime">Ending time for the trade execution window. This is a window of time when trades are allowed to be executed during any given session</param>
-        /// <param name="contracts">Number of contracts being executed with each trade</param>
-        /// <param name="accountBalance">Starting account balance</param>
-        /// <param name="pricePerTick">How much an executed trade is worth per-tick. MNQ = .50 cents per tick</param>
-        public PriceExtremeStrategy(
-            int timeframe,
-            TimeOnly tradingWindowStartTime,
-            TimeOnly tradingWindowEndTime,
-            int contracts = 5,
-            decimal accountBalance = 1000,
-            decimal pricePerTick = .5m) 
-            : base(
-                timeframe, 
-                tradingWindowStartTime, 
-                tradingWindowEndTime, 
-                contracts, 
-                accountBalance, 
-                pricePerTick)
+        public PriceExtremeStrategy() : base()
+        {
+            this.EmaIndicators = new Dictionary<int, List<EmaValue>>();
+        }
+
+        public PriceExtremeStrategy(StrategyConfig config) : base(config)
         {
             this.EmaIndicators = new Dictionary<int, List<EmaValue>>();
         }
         #endregion
 
+        #region overridden methods
         /// <summary>
         /// Checks a candle to see if a long entry condition has been met
         /// </summary>
@@ -100,6 +85,18 @@ namespace TradingDataAnalytics.Application
             return false;
         }
 
+        public override void LoadCustomStrategyStuff()
+        {
+            var ema = new Ema();
+
+            this.EmaIndicators.Add(10, ema.Calculate(this.Candles, 10).ToList());
+            this.EmaIndicators.Add(20, ema.Calculate(this.Candles, 20).ToList());
+        }
+
+        #endregion
+
+        #region private methods
+
         private decimal CalculateEmaPriceChange(CandleStick candle, decimal emaValue)
         {
             var priceChange = candle.Close > emaValue
@@ -108,5 +105,7 @@ namespace TradingDataAnalytics.Application
 
             return priceChange;
         }
+
+        #endregion
     }
 }

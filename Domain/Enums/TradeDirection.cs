@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TradingDataAnalytics.Domain.Enums
 {
-    public enum Direction
+    public enum TradeDirection
     {
         Long,
         Short,

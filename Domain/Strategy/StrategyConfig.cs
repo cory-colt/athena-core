@@ -17,9 +17,9 @@ namespace TradingDataAnalytics.Domain.Strategy
 
         public int Timeframe { get; set; }
 
-        public TradingTimeWindow TradingWindowStartTime { get; set; }
+        public StrategyTradingTimeWindow TradingWindowStartTime { get; set; }
 
-        public TradingTimeWindow TradingWindowEndTime { get; set; }
+        public StrategyTradingTimeWindow TradingWindowEndTime { get; set; }
 
         public decimal StartingAccountBalance { get; set; }
 
@@ -27,35 +27,6 @@ namespace TradingDataAnalytics.Domain.Strategy
 
         public bool StopTradingAfterWinning { get; set; }
 
-        public ExecutionSettings ExecutionSettings { get; set; }        
-    }
-
-    public struct TradingTimeWindow
-    { 
-        public int Hour { get; set; }
-
-        public int Minute { get; set; }
-    }
-
-    public struct ExecutionSettings
-    {
-        public int Contracts { get; set; }
-
-        public int InitialStopLoss { get; set; }
-
-        public bool TrailStopToBreakeven { get; set; }
-
-        public int TrailStopTrigger { get; set; }
-
-        public List<ProfitTarget> ProfitTargets { get; set; }
-    }
-
-    public struct ProfitTarget
-    {
-        public int ProfitTargetPrice { get; set; }
-
-        public int Contracts { get; set; }
-
-        public int Stop { get; set; }
+        public StrategyExecutionSettings ExecutionSettings { get; set; }        
     }
 }

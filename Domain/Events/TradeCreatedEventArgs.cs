@@ -12,5 +12,7 @@ namespace TradingDataAnalytics.Domain.Events
         public DateTime DateCreated { get; set; }
 
         public decimal EntryPrice { get; set; }
+
+        public TradeDirection Direction { get; set; }
     }
 }

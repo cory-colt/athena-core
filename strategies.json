@@ -17,23 +17,23 @@
     "maxTradesPerSession": 3,
     "stopTradingAfterWinning": true,
     "executionSettings": {
-      "contracts": 5,
+      "contracts": 10,
       "initialStopLoss": 20,
       "trailStopToBreakeven": false,
       "trailStopTrigger": 20,
       "profitTargets": [
         {
-          "profitTargetPrice": 10,
+          "profitTarget": 10,
           "contracts": 3,
           "stop": 0
         },
         {
-          "profitTargetPrice": 20,
+          "profitTarget": 20,
           "contracts": 1,
           "stop": 20
         },
         {
-          "profitTargetPrice": 30,
+          "profitTarget": 30,
           "contracts": 1,
           "stop": 0
         }

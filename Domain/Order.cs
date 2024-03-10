@@ -15,7 +15,7 @@ namespace TradingDataAnalytics.Domain
 
         public DateTime ClosingDate { get; set; }
 
-        public Direction OrderDirection { get; set; }
+        public TradeDirection OrderDirection { get; set; }
 
         public decimal OrderPrice { get; set; }
     }
