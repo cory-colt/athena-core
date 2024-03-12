@@ -15,20 +15,25 @@
     },
     "startingAccountBalance": 1000,
     "maxTradesPerSession": 3,
-    "stopTradingAfterWinning": true,
+    "stopTradingAfterWinning": false,
     "executionSettings": {
-      "contracts": 5,
-      "initialStopLoss": 30,
-      "trailStopToBreakeven": false,
+      "contracts": 10,
+      "initialStopLoss": 15,
+      "trailStopToBreakeven": true,
       "trailStopTrigger": 20,
       "profitTargets": [
         {
           "profitTarget": 20,
-          "contracts": 4,
-          "stop": 20
+          "contracts": 5,
+          "stop": 0
         },
         {
           "profitTarget": 30,
+          "contracts": 4,
+          "stop": 0
+        },
+        {
+          "profitTarget": 50,
           "contracts": 1,
           "stop": 0
         }

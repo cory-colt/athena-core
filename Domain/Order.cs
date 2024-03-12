@@ -38,5 +38,10 @@ namespace TradingDataAnalytics.Domain
         /// Price the order was executed for
         /// </summary>
         public decimal OrderPrice { get; set; }
+
+        /// <summary>
+        /// Price (in points) to move the <see cref="Trade"/>'s stoploss to once this profit target gets hit
+        /// </summary>
+        public int TrailStopTrigger { get; set; }
     }
 }

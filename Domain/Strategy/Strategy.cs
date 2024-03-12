@@ -29,6 +29,11 @@ namespace TradingDataAnalytics.Domain.Strategy
         /// ProfitTargetHit is fired every time a profit target is hit. See <see cref="ProfitTargetHitEventArgs"/> for more details
         /// </summary>
         public event EventHandler<ProfitTargetHitEventArgs> ProfitTargetHit;
+
+        /// <summary>
+        /// StopLossHit is fired every time a trade was closed as a result of a stoploss getting triggered. <see cref="StopLossEventArgs"/> for more details
+        /// </summary>
+        public event EventHandler<StopLossEventArgs> StopLossHit;
         #endregion
 
         #region public properties
@@ -327,7 +332,7 @@ namespace TradingDataAnalytics.Domain.Strategy
                     pendingTrade.Outcome = TradeOutcome.Win;
 
                     // publish the TradeClosed event
-                    OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = this.AccountBalance }); ;
+                    OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, NewAccountBalance = this.AccountBalance }); ;
                 }
             }
         }
@@ -337,23 +342,10 @@ namespace TradingDataAnalytics.Domain.Strategy
             // check if stop-loss was hit
             if (candle.Low <= pendingTrade.StopLoss?.OrderPrice || candle.Close <= pendingTrade.StopLoss?.OrderPrice)
             {
-                // calculate loss
-                var loss = this.InitialStopLoss * (this.PricePerTick * 4) * pendingTrade.Contracts * -1;
-
-                // update the pending trade's status
-                pendingTrade.StopLoss.ClosingDate = candle.TimeOfDay;
-                pendingTrade.Outcome = TradeOutcome.Loss;
-                pendingTrade.Profit = loss;
-
-                var oldAccountBalance = AccountBalance;
-                var newAccountBalance = AccountBalance += loss;
-
-                // calculate stop loss
-                this.TotalLosses += loss;
-                this.AccountBalance = newAccountBalance;
+                ProcessStopLossHit(pendingTrade, candle);
 
                 // publish the TradeClosed event
-                OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance });
+                OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, NewAccountBalance = this.AccountBalance });
             }
         }
 
@@ -381,7 +373,7 @@ namespace TradingDataAnalytics.Domain.Strategy
                     pendingTrade.Outcome = TradeOutcome.Win;
 
                     // publish the TradeClosed event
-                    OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = this.AccountBalance }); ;
+                    OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, NewAccountBalance = this.AccountBalance }); ;
                 }
             }
         }
@@ -396,28 +388,37 @@ namespace TradingDataAnalytics.Domain.Strategy
             // check if stop-loss was hit
             if (candle.High >= pendingTrade.StopLoss?.OrderPrice || candle.Close >= pendingTrade.StopLoss?.OrderPrice)
             {
-                // calculate loss
-                var loss = this.InitialStopLoss * (this.PricePerTick * 4) * pendingTrade.Contracts * -1;
-
-                // update the pending trade's status
-                pendingTrade.StopLoss.ClosingDate = candle.TimeOfDay;
-                pendingTrade.Outcome = TradeOutcome.Loss;
-                pendingTrade.Profit = loss;
-
-                var oldAccountBalance = AccountBalance;
-                var newAccountBalance = AccountBalance += loss;
-
-                // update the strategy metrics
-                this.TotalLosses += loss;
-                this.AccountBalance = newAccountBalance;
+                ProcessStopLossHit(pendingTrade, candle);
 
                 // publish the TradeClosed event
-                OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, OldAccountBalance = oldAccountBalance, NewAccountBalance = newAccountBalance });
+                OnTradeClosed(new TradeClosedEventArgs { ClosedTrade = pendingTrade, NewAccountBalance = this.AccountBalance });
             }
         }
         #endregion
 
         #region private methods
+
+        private void ProcessStopLossHit(Trade pendingTrade, CandleStick candle)
+        {
+            // calculate loss
+            var loss = (pendingTrade.StopLoss.OrderPrice == pendingTrade.InitialEntryPrice) ? 0 : this.InitialStopLoss * (this.PricePerTick * 4) * pendingTrade.Contracts * -1;
+
+            // update the pending trade's status
+            pendingTrade.StopLoss.ClosingDate = candle.TimeOfDay;
+            pendingTrade.Outcome = TradeOutcome.Loss;
+            pendingTrade.Profit += loss;
+
+            var oldAccountBalance = AccountBalance;
+            var newAccountBalance = AccountBalance += loss;
+
+            // update the strategy metrics
+            this.TotalLosses += loss;
+            this.AccountBalance = newAccountBalance;
+
+            // publish the StopLossHit event
+            OnStopLossHit(new StopLossEventArgs { TradeId = pendingTrade.Id, StopLossOrder = pendingTrade.StopLoss, LossAmount = pendingTrade.Profit, Outcome = (loss == 0) ? TradeOutcome.Breakeven : TradeOutcome.StoppedOut });
+        }
+
         private void ProcessProfitTargetHit(Order profitTargetOrder, Trade pendingTrade, CandleStick candle)
         {
             // calculate profit for this profit target
@@ -434,8 +435,22 @@ namespace TradingDataAnalytics.Domain.Strategy
             this.AccountBalance += profit;
             this.TotalProfit += profit;
 
+            // check to see if the profit target has a stoploss trigger
+            if (profitTargetOrder.TrailStopTrigger != 0)
+            {
+                // move the trade's stop price
+                if (pendingTrade.TradeDirection == TradeDirection.Long)
+                    pendingTrade.StopLoss.OrderPrice += profitTargetOrder.TrailStopTrigger;
+                else
+                    pendingTrade.StopLoss.OrderPrice -= profitTargetOrder.TrailStopTrigger;
+            } else if (this.TrailStopToBreakeven)
+            {
+                // trail stop to break even
+                pendingTrade.StopLoss.OrderPrice = pendingTrade.InitialEntryPrice;
+            }
+
             // publish the ProfitTargetHit event
-            OnProfitTargetHit(new ProfitTargetHitEventArgs { ProfitTargetOrder = profitTargetOrder, Profit = profit, Outcome = TradeOutcome.Win });
+            OnProfitTargetHit(new ProfitTargetHitEventArgs { TradeId = pendingTrade.Id, ProfitTargetOrder = profitTargetOrder, Profit = profit, Outcome = TradeOutcome.Win });
         }
         #endregion
 
@@ -492,6 +507,11 @@ namespace TradingDataAnalytics.Domain.Strategy
         public virtual void OnProfitTargetHit(ProfitTargetHitEventArgs args)
         {
             ProfitTargetHit?.Invoke(this, args);
+        }
+
+        public virtual void OnStopLossHit(StopLossEventArgs args)
+        {
+            StopLossHit?.Invoke(this, args);
         }
         #endregion
 

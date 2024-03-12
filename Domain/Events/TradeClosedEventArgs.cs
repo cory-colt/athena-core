@@ -10,8 +10,6 @@ namespace TradingDataAnalytics.Domain.Events
     public class TradeClosedEventArgs
     {
         public Trade ClosedTrade { get; set; }
-        
-        public decimal OldAccountBalance { get; set; }
 
         public decimal NewAccountBalance { get; set; }
     }
