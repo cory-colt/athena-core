@@ -398,27 +398,36 @@ namespace TradingDataAnalytics.Domain.Strategy
 
         #region private methods
 
+        /// <summary>
+        /// Process what happens when a stop loss is hit
+        /// </summary>
+        /// <param name="pendingTrade"><see cref="Order"/> containing the stop loss information</param>
+        /// <param name="candle">The current <see cref="CandleStick"/> used for comparison to see if the stop loss was hit</param>
         private void ProcessStopLossHit(Trade pendingTrade, CandleStick candle)
         {
+            var isBreakEven = pendingTrade.StopLoss.OrderPrice == pendingTrade.InitialEntryPrice;
+
             // calculate loss
-            var loss = (pendingTrade.StopLoss.OrderPrice == pendingTrade.InitialEntryPrice) ? 0 : this.InitialStopLoss * (this.PricePerTick * 4) * pendingTrade.Contracts * -1;
+            var loss = (isBreakEven) ? 0 : this.InitialStopLoss * (this.PricePerTick * 4) * pendingTrade.Contracts * -1;
 
             // update the pending trade's status
             pendingTrade.StopLoss.ClosingDate = candle.TimeOfDay;
-            pendingTrade.Outcome = TradeOutcome.Loss;
+            pendingTrade.Outcome = (isBreakEven) ? TradeOutcome.Breakeven : TradeOutcome.Loss;
             pendingTrade.Profit += loss;
 
-            var oldAccountBalance = AccountBalance;
-            var newAccountBalance = AccountBalance += loss;
-
             // update the strategy metrics
-            this.TotalLosses += loss;
-            this.AccountBalance = newAccountBalance;
+            UpdateAccountBalances(loss);
 
             // publish the StopLossHit event
             OnStopLossHit(new StopLossEventArgs { TradeId = pendingTrade.Id, StopLossOrder = pendingTrade.StopLoss, LossAmount = pendingTrade.Profit, Outcome = (loss == 0) ? TradeOutcome.Breakeven : TradeOutcome.StoppedOut });
         }
 
+        /// <summary>
+        /// Processes what happens when a profit target is hit
+        /// </summary>
+        /// <param name="profitTargetOrder"><see cref="Order"/> containing the profit target information</param>
+        /// <param name="pendingTrade">The currently pending <see cref="Trade"/> used for calculating the profit</param>
+        /// <param name="candle">The current <see cref="CandleStick"/> used for comparison to see if the profit target was hit</param>
         private void ProcessProfitTargetHit(Order profitTargetOrder, Trade pendingTrade, CandleStick candle)
         {
             // calculate profit for this profit target
@@ -432,12 +441,12 @@ namespace TradingDataAnalytics.Domain.Strategy
             profitTargetOrder.ClosingDate = candle.TimeOfDay;
 
             // update the strategy's metrics
-            this.AccountBalance += profit;
-            this.TotalProfit += profit;
+            UpdateAccountBalances(profit);
 
             // check to see if the profit target has a stoploss trigger
             if (profitTargetOrder.TrailStopTrigger != 0)
             {
+                // TODO: I don't think I'm going to keep this functionality for triggering a trailing stop from a profit target itself (see strategies.json)
                 // move the trade's stop price
                 if (pendingTrade.TradeDirection == TradeDirection.Long)
                     pendingTrade.StopLoss.OrderPrice += profitTargetOrder.TrailStopTrigger;
@@ -451,6 +460,20 @@ namespace TradingDataAnalytics.Domain.Strategy
 
             // publish the ProfitTargetHit event
             OnProfitTargetHit(new ProfitTargetHitEventArgs { TradeId = pendingTrade.Id, ProfitTargetOrder = profitTargetOrder, Profit = profit, Outcome = TradeOutcome.Win });
+        }
+
+        /// <summary>
+        /// Updates the <see cref="Strategy"/>'s account balance and running profit and loss
+        /// </summary>
+        /// <param name="profitAndLoss">Amount of profit and loss to update the account balance by</param>
+        private void UpdateAccountBalances(decimal profitAndLoss)
+        {
+            // update the strategy's running account balance
+            this.AccountBalance += profitAndLoss;
+
+            // update the strategy's running total profit and total losses
+            this.TotalProfit += (profitAndLoss > 0) ? profitAndLoss : 0;
+            this.TotalLosses += (profitAndLoss < 0) ? profitAndLoss : 0;
         }
         #endregion
 

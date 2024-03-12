@@ -261,7 +261,8 @@ namespace TradingDataAnalytics.Domain.Strategy
 
         private void Strategy_StopLossHit(object? sender, Events.StopLossEventArgs e)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
+            if (e.Outcome == TradeOutcome.StoppedOut)
+                Console.ForegroundColor = ConsoleColor.Red;
 
             Console.WriteLine(string.Format("{0, 12} | {1,25} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12} | {7, 12}",
                 e.TradeId.ToString().Substring(0, 7),
@@ -269,7 +270,7 @@ namespace TradingDataAnalytics.Domain.Strategy
                 "-",
                 "-",
                 e.StopLossOrder?.OrderPrice,
-                string.Format("{0:C}", e.LossAmount),
+                (e.Outcome == TradeOutcome.StoppedOut) ? string.Format("{0:C}", e.LossAmount) : "$0.00",
                 e.Outcome,
                 "-"));
 

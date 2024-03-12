@@ -18,23 +18,13 @@
     "stopTradingAfterWinning": false,
     "executionSettings": {
       "contracts": 10,
-      "initialStopLoss": 15,
-      "trailStopToBreakeven": true,
+      "initialStopLoss": 20,
+      "trailStopToBreakeven": false,
       "trailStopTrigger": 20,
       "profitTargets": [
         {
-          "profitTarget": 20,
-          "contracts": 5,
-          "stop": 0
-        },
-        {
-          "profitTarget": 30,
-          "contracts": 4,
-          "stop": 0
-        },
-        {
-          "profitTarget": 50,
-          "contracts": 1,
+          "profitTarget": 25,
+          "contracts": 10,
           "stop": 0
         }
       ]
