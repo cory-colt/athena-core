@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34601.278
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingDataAnalytics", "TradingDataAnalytics.csproj", "{5A6D9003-F4A7-4ACB-9387-4893AA100DDF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Athena", "Athena.csproj", "{5A6D9003-F4A7-4ACB-9387-4893AA100DDF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingDataAnalytics.Tests", "..\TradingDataAnalytics.Tests\TradingDataAnalytics.Tests.csproj", "{225E511C-0243-4E3D-8E62-1CA1A003AF04}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Athena.Tests", "..\TradingDataAnalytics.Tests\Athena.Tests.csproj", "{225E511C-0243-4E3D-8E62-1CA1A003AF04}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

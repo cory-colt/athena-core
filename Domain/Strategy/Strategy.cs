@@ -185,40 +185,10 @@ namespace TradingDataAnalytics.Domain.Strategy
 
         #region constructors
         /// <summary>
-        /// Instantiates a new Strategy with minimal information
-        /// </summary>
-        /// <param name="timeframe">Timeframe the strategy will be tested against in minutes. (i.e. 3 = 3 minute timeframe; 5 = 5 minute timeframe, etc)</param>
-        /// <param name="tradingWindowStartTime">Starting time for the trade execution window. This is a window of time when trades are allowed to be executed during any given session</param>
-        /// <param name="tradingWindowEndTime">Ending time for the trade execution window. This is a window of time when trades are allowed to be executed during any given session</param>
-        /// <param name="contracts">Number of contracts being executed with each trade</param>
-        /// <param name="accountBalance">Starting account balance</param>
-        /// <param name="pricePerTick">How much an executed trade is worth per-tick. MNQ = .50 cents per tick</param>
-        public Strategy(
-            int timeframe,
-            TimeOnly tradingWindowStartTime,
-            TimeOnly tradingWindowEndTime,
-            int contracts = 5,
-            decimal accountBalance = 1000,
-            decimal pricePerTick = .5m)
-        {
-            Timeframe = timeframe;
-            TradingWindowStartTime = tradingWindowStartTime;
-            TradingWindowEndTime = tradingWindowEndTime;
-            Contracts = contracts;
-            AccountBalance = accountBalance;
-            InitialAccountBalance = accountBalance;
-            PricePerTick = pricePerTick;
-            Status = StrategyStatus.OutOfTheMarket;
-            Trades = new List<Trade>();
-            InitialStopLoss = 20;
-            MaxTradesPerSession = 2;
-        }
-
-        /// <summary>
         /// Instantiates a new Strategy with a <see cref="StrategyConfig"/>
         /// </summary>
         /// <param name="config"><see cref="StrategyConfig"/> object to use when setting all the properties</param>
-        public Strategy(StrategyConfig config)
+        public Strategy(StrategyConfig config) : this()
         {
             StrategyConfig = config;
             Timeframe = config.Timeframe;
@@ -228,8 +198,6 @@ namespace TradingDataAnalytics.Domain.Strategy
             AccountBalance = config.StartingAccountBalance;
             InitialAccountBalance = config.StartingAccountBalance;
             PricePerTick = config.PricePerTick;
-            Status = StrategyStatus.OutOfTheMarket;
-            Trades = new List<Trade>();
             InitialStopLoss = config.ExecutionSettings.InitialStopLoss;
             MaxTradesPerSession = config.MaxTradesPerSession;
         }
