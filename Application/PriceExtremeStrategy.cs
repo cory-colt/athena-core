@@ -48,7 +48,7 @@ namespace TradingDataAnalytics.Application
                 var priceChange = CalculateEmaPriceChange(candle, ema.Value);
 
                 // TODO: this price change amount should not be hard-coded
-                if (priceChange < 0 && priceChange <= -.24m)
+                if (priceChange < 0 && priceChange <= -.25m)
                 {
                     return true;
                 }
@@ -76,7 +76,7 @@ namespace TradingDataAnalytics.Application
                 var priceChange = CalculateEmaPriceChange(candle, ema.Value);
 
                 // TODO: this price change amount should not be hard-coded
-                if (priceChange > 0 && priceChange >= .24m)
+                if (priceChange > 0 && priceChange >= .25m)
                 {
                     return true;
                 }

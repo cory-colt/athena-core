@@ -14,6 +14,7 @@ namespace TradingDataAnalytics.Domain.Strategy
     {
         private readonly List<StrategyConfig> _strategyConfigs = new List<StrategyConfig>();
         private readonly string _candleDataFile = string.Empty;
+        private readonly ILogger _logger;
 
         #region constructors
         /// <summary>
@@ -23,11 +24,13 @@ namespace TradingDataAnalytics.Domain.Strategy
         /// <param name="candleDataFile">Fully qualified name of the candle data csv file</param>
         public StrategyEngine(
             List<StrategyConfig> strategyConfigs, 
-            string candleDataFile
+            string candleDataFile, 
+            ILogger logger
             )
         {
             this._strategyConfigs = strategyConfigs;
             this._candleDataFile = candleDataFile;
+            this._logger = logger;
         }
 
         /// <summary>
@@ -37,11 +40,13 @@ namespace TradingDataAnalytics.Domain.Strategy
         /// <param name="candleDataFile">Fully qualified name of the candle data csv file</param>
         public StrategyEngine(
             string strategyConfigFile, 
-            string candleDataFile
+            string candleDataFile,
+            ILogger logger
             )
         {
             this._strategyConfigs = LoadStrategyConfigs(strategyConfigFile);
             this._candleDataFile = candleDataFile;
+            this._logger = logger;
         }
         #endregion
 
@@ -66,45 +71,20 @@ namespace TradingDataAnalytics.Domain.Strategy
                     // subscrbe to strategy events
                     strategy.TradeClosed += Strategy_TradeClosed;
                     strategy.TradeCreated += Strategy_TradeCreated;
+                    strategy.ProfitTargetHit += Strategy_ProfitTargetHit;
+                    strategy.StopLossHit += Strategy_StopLossHit;
 
                     StartLookingForTradeOpportunities(strategy);
                     
                     // unsubscribe from the events
                     strategy.TradeClosed -= Strategy_TradeClosed;
                     strategy.TradeCreated -= Strategy_TradeCreated;
+                    strategy.ProfitTargetHit -= Strategy_ProfitTargetHit;
+                    strategy.StopLossHit -= Strategy_StopLossHit;
                 }
             }            
         }
-        
-        #endregion
 
-        #region event handlers
-        void Strategy_TradeClosed(object? sender, TradingDataAnalytics.Domain.Events.TradeClosedEventArgs e)
-        {
-            var dateClosed = e.ClosedTrade.Outcome == TradeOutcome.Loss ? e.ClosedTrade.StopLoss?.ClosingDate : e.ClosedTrade.ProfitTarget?.ClosingDate;
-            var closingPrice = e.ClosedTrade.Outcome == TradeOutcome.Loss ? e.ClosedTrade.StopLoss?.OrderPrice : e.ClosedTrade.ProfitTarget?.OrderPrice;
-            
-            Console.WriteLine(string.Format("{0, 12} | {1,20} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}",
-                e.ClosedTrade.Id.ToString().Substring(0, 7),
-                dateClosed,
-                "-",
-                "-",
-                closingPrice,
-                string.Format("{0:C}", e.ClosedTrade.Profit),
-                e.ClosedTrade.Outcome));
-        }
-
-        private void Strategy_TradeCreated(object? sender, Events.TradeCreatedEventArgs e)
-        {
-            Console.WriteLine(string.Format("{0, 12} | {1,20} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}",
-                e.TradeCreated.Id.ToString().Substring(0, 7),
-                e.TradeCreated.ProfitTarget?.OpeningDate,
-                e.TradeCreated.TradeDirection,
-                e.TradeCreated.InitialEntryPrice,
-                e.TradeCreated.StopLoss?.OrderPrice,
-                "-",
-                "-"));
-        }
         #endregion
 
         #region private methods
@@ -112,7 +92,7 @@ namespace TradingDataAnalytics.Domain.Strategy
         private void StartLookingForTradeOpportunities(Strategy strategy)
         {
             // write the beginning strategy header to the console
-            WriteStrategyHeaderToConsole(strategy);
+            WriteStrategyHeaderToLogger(strategy);
 
             // iterate over each tradable session and execute the strategy
             foreach (var session in strategy.AvailableSessions)
@@ -158,12 +138,12 @@ namespace TradingDataAnalytics.Domain.Strategy
             }
 
             // output strategy summary to the console
-            WriteSummaryToConsole(strategy);
+            WriteSummaryToLogger(strategy);
         }
 
         private Trade CreateTrade(CandleStick candle, Strategy strategy, TradeDirection direction)
         {
-            return new Trade
+            var tradeToExecute = new Trade
             {
                 Id = Guid.NewGuid(),
                 InitialEntryPrice = candle.Close,
@@ -178,14 +158,20 @@ namespace TradingDataAnalytics.Domain.Strategy
                     OrderDirection = TradeDirection.StopLoss,
                     OrderPrice = (direction == TradeDirection.Long) ? candle.Close - strategy.InitialStopLoss : candle.Close + strategy.InitialStopLoss
                 },
-                ProfitTarget = new Order
-                {
-                    Id = Guid.NewGuid(),
-                    OpeningDate = candle.TimeOfDay,
-                    OrderDirection = (direction == TradeDirection.Long) ? TradeDirection.Long : TradeDirection.Short,
-                    OrderPrice = (direction == TradeDirection.Long) ? candle.Close + 30 : candle.Close - 30 // TODO: profit targets need to retrieved based on the strategies.json
-                }
+                ProfitTargets = strategy.ProfitTargets
+                    .Select(m => new Order
+                    {
+                        Id = Guid.NewGuid(),
+                        Contracts = m.Contracts,
+                        OrderPrice = (direction == TradeDirection.Long) ? candle.Close + m.ProfitTarget : candle.Close - m.ProfitTarget,
+                        OpeningDate = candle.TimeOfDay,
+                        TrailStopTrigger = m.Stop, 
+                        OrderDirection = (direction == TradeDirection.Long) ? TradeDirection.Long : TradeDirection.Short
+                    })
+                    .ToList()
             };
+
+            return tradeToExecute;
         }
 
         /// <summary>
@@ -204,26 +190,91 @@ namespace TradingDataAnalytics.Domain.Strategy
             }
         }
 
-        private void WriteStrategyHeaderToConsole(Strategy strategy)
+        private void WriteStrategyHeaderToLogger(Strategy strategy)
         {
-            Console.WriteLine($"Executing Strategy: [{strategy.Name}] - Starting Account Balance: [{strategy.AccountBalance}]");
-            Console.WriteLine("---------------------------------------------------------------------------------------------------------------");
-            Console.WriteLine(string.Format("{0, 12} | {1, 20} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}", "Id", "Date", "Direction", "Entry Price", "Closing Price", "P/L", "Outcome"));
-            Console.WriteLine("---------------------------------------------------------------------------------------------------------------");
+            _logger.Info($"Executing Strategy: [{strategy.Name}] - Starting Account Balance: [{strategy.AccountBalance}]");
+            _logger.Info("------------------------------------------------------------------------------------------------------------------------------------------------");
+            _logger.Info(string.Format("{0, 12} | {1, 25} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12} | {7, 12}", "Id", "Date", "Direction", "Entry Price", "Closing Price", "P/L", "Outcome", "Account Balance"));
+            _logger.Info("------------------------------------------------------------------------------------------------------------------------------------------------");
         }
 
-        private static void WriteSummaryToConsole(Strategy strategy)
+        private void WriteSummaryToLogger(Strategy strategy)
         {
-            Console.WriteLine($"---------------------- STRATEGY SUMMARY STATISTICS --------------------------");
-            Console.WriteLine();
+            var gainOnAccount = strategy.AccountBalance - strategy.InitialAccountBalance;
 
-            Console.WriteLine($"Gain on Account: {strategy.AccountBalance - strategy.InitialAccountBalance} ({(strategy.AccountBalance - strategy.InitialAccountBalance) / strategy.InitialAccountBalance * 100}%) - Total Trades: {strategy.Trades.Count}");
+            _logger.Info($"---------------------- STRATEGY SUMMARY STATISTICS --------------------------");
+            _logger.Info("\n");
+
+            _logger.Info($"Gain on Account: {string.Format("{0:C}", gainOnAccount)} ({(strategy.AccountBalance - strategy.InitialAccountBalance) / strategy.InitialAccountBalance * 100}%) - Total Trades: {strategy.Trades.Count}");
             var losses = Convert.ToDecimal(strategy.Trades.Where(m => m.Outcome == TradeOutcome.Loss).Count());
             var wins = Convert.ToDecimal(strategy.Trades.Where(m => m.Outcome == TradeOutcome.Win).Count());
             var totalTrades = Convert.ToDecimal(strategy.Trades.Count);
             var winRate = Convert.ToDecimal(wins / totalTrades * 100);
-            Console.WriteLine(string.Format("{0,10} | {1,10} | {2, 10}", "Wins", "Losses", "Win-Rate"));
-            Console.WriteLine(string.Format("{0,10} | {1,10} | {2, 10}%", wins, losses, winRate.ToString("0.00")));
+            _logger.Info(string.Format("{0,10} | {1,10} | {2, 10}", "Wins", "Losses", "Win-Rate"));
+            _logger.Info(string.Format("{0,10} | {1,10} | {2, 10}%", wins, losses, winRate.ToString("0.00")));
+        }
+        #endregion
+
+        #region event handlers
+        void Strategy_TradeClosed(object? sender, TradingDataAnalytics.Domain.Events.TradeClosedEventArgs e)
+        {
+            var dateClosed = e.ClosedTrade.Outcome == TradeOutcome.Loss ? e.ClosedTrade.StopLoss?.ClosingDate : e.ClosedTrade.ProfitTargets.Last().ClosingDate;
+            var closingPrice = e.ClosedTrade.Outcome == TradeOutcome.Loss ? e.ClosedTrade.StopLoss?.OrderPrice : e.ClosedTrade.ProfitTargets.Last(m => m.ClosingDate != null).OrderPrice;
+
+            _logger.Info(string.Format("{0, 12} | {1,25} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12} | {7, 12}",
+                e.ClosedTrade.Id.ToString().Substring(0, 7),
+                dateClosed,
+                "-",
+                "-",
+                closingPrice,
+                "-", // string.Format("{0:C}", e.ClosedTrade.Profit),
+                e.ClosedTrade.Outcome, 
+                string.Format("{0:C}", e.NewAccountBalance)));
+        }
+
+        private void Strategy_TradeCreated(object? sender, Events.TradeCreatedEventArgs e)
+        {
+            _logger.Info("------------------------------------------------------------------------------------------------------------------------------------------------");
+            _logger.Info(string.Format("{0, 12} | {1,25} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12} | {7, 12}",
+                e.TradeCreated.Id.ToString().Substring(0, 7),
+                e.TradeCreated.ProfitTargets.First().OpeningDate,
+                e.TradeCreated.TradeDirection,
+                e.TradeCreated.InitialEntryPrice,
+                e.TradeCreated.StopLoss?.OrderPrice,
+                "-",
+                "-", 
+                "-"));
+        }
+
+        private void Strategy_ProfitTargetHit(object? sender, Events.ProfitTargetHitEventArgs e)
+        {
+            _logger.Info(string.Format("{0, 12} | {1,25} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12} | {7, 12}",
+                e.TradeId.ToString().Substring(0, 7),
+                e.ProfitTargetOrder?.ClosingDate,
+                "-",
+                "-", 
+                e.ProfitTargetOrder?.OrderPrice,
+                string.Format("{0:C}", e.Profit),
+                "PT Hit", 
+                "-"));
+        }
+
+        private void Strategy_StopLossHit(object? sender, Events.StopLossEventArgs e)
+        {
+            if (e.Outcome == TradeOutcome.StoppedOut)
+                Console.ForegroundColor = ConsoleColor.Red;
+
+            _logger.Info(string.Format("{0, 12} | {1,25} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12} | {7, 12}",
+                e.TradeId.ToString().Substring(0, 7),
+                e.StopLossOrder?.ClosingDate,
+                "-",
+                "-",
+                e.StopLossOrder?.OrderPrice,
+                (e.Outcome == TradeOutcome.StoppedOut) ? string.Format("{0:C}", e.LossAmount) : "$0.00",
+                e.Outcome,
+                "-"));
+
+            Console.ForegroundColor = ConsoleColor.Black;
         }
         #endregion
     }

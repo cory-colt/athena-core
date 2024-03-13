@@ -11,6 +11,7 @@ namespace TradingDataAnalytics.Domain.Enums
         Loss,
         Win,
         Breakeven,
-        Pending
+        Pending, 
+        StoppedOut
     }
 }

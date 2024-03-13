@@ -50,8 +50,8 @@ namespace TradingDataAnalytics.Domain
         public Order? StopLoss { get; set; }
 
         /// <summary>
-        /// Profit targets <see cref="Order"/>
+        /// Profit targets to execute
         /// </summary>
-        public Order? ProfitTarget { get; set; }
+        public List<Order> ProfitTargets { get; set; } = new List<Order>();
     }
 }
