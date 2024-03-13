@@ -10,7 +10,7 @@
       "minute": 30
     },
     "tradingWindowEndTime": {
-      "hour": 9,
+      "hour": 10,
       "minute": 0
     },
     "startingAccountBalance": 1000,
@@ -18,13 +18,19 @@
     "stopTradingAfterWinning": false,
     "executionSettings": {
       "contracts": 10,
-      "initialStopLoss": 20,
+      "initialStopLoss": 40,
       "trailStopToBreakeven": false,
+      "trailStopToHalfStop":  true, 
       "trailStopTrigger": 20,
       "profitTargets": [
         {
-          "profitTarget": 25,
-          "contracts": 10,
+          "profitTarget": 20,
+          "contracts": 5,
+          "stop": 0
+        },
+        {
+          "profitTarget": 30,
+          "contracts": 5,
           "stop": 0
         }
       ]

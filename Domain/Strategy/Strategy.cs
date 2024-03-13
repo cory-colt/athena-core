@@ -146,6 +146,11 @@ namespace TradingDataAnalytics.Domain.Strategy
         public bool TrailStopToBreakeven { get; set; } = false;
 
         /// <summary>
+        /// Determines if a stop can be trailed to half a stop loss
+        /// </summary>
+        public bool TrailStopToHalfStop { get; set; } = false;
+
+        /// <summary>
         /// Trigger price (in points) for when the stop should be moved to breakeven. This only works if TrailStopToBreakEven = true
         /// </summary>
         public int TrailStopTrigger { get; set; }
@@ -290,6 +295,7 @@ namespace TradingDataAnalytics.Domain.Strategy
             this.Timeframe = config.Timeframe;
             this.StopTradingAfterWinning = config.StopTradingAfterWinning;
             this.TrailStopToBreakeven = config.ExecutionSettings.TrailStopToBreakeven;
+            this.TrailStopToHalfStop = config.ExecutionSettings.TrailStopToHalfStop;
             this.TrailStopTrigger = config.ExecutionSettings.TrailStopTrigger;
             this.ProfitTargets = config.ExecutionSettings.ProfitTargets;
             this.TradingWindowEndTime = new TimeOnly(config.TradingWindowEndTime.Hour + 2, config.TradingWindowEndTime.Minute); // + 2 is because the candle data is in EST, not MST
@@ -408,7 +414,7 @@ namespace TradingDataAnalytics.Domain.Strategy
             var isBreakEven = pendingTrade.StopLoss.OrderPrice == pendingTrade.InitialEntryPrice;
 
             // calculate loss
-            var loss = (isBreakEven) ? 0 : this.InitialStopLoss * (this.PricePerTick * 4) * pendingTrade.Contracts * -1;
+            var loss = (isBreakEven) ? 0 : Math.Abs(pendingTrade.StopLoss.OrderPrice - pendingTrade.InitialEntryPrice) * (this.PricePerTick * 4) * pendingTrade.Contracts * -1;
 
             // update the pending trade's status
             pendingTrade.StopLoss.ClosingDate = candle.TimeOfDay;
@@ -419,7 +425,7 @@ namespace TradingDataAnalytics.Domain.Strategy
             UpdateAccountBalances(loss);
 
             // publish the StopLossHit event
-            OnStopLossHit(new StopLossEventArgs { TradeId = pendingTrade.Id, StopLossOrder = pendingTrade.StopLoss, LossAmount = pendingTrade.Profit, Outcome = (loss == 0) ? TradeOutcome.Breakeven : TradeOutcome.StoppedOut });
+            OnStopLossHit(new StopLossEventArgs { TradeId = pendingTrade.Id, StopLossOrder = pendingTrade.StopLoss, LossAmount = loss, Outcome = (loss == 0) ? TradeOutcome.Breakeven : TradeOutcome.StoppedOut });
         }
 
         /// <summary>
@@ -443,19 +449,17 @@ namespace TradingDataAnalytics.Domain.Strategy
             // update the strategy's metrics
             UpdateAccountBalances(profit);
 
-            // check to see if the profit target has a stoploss trigger
-            if (profitTargetOrder.TrailStopTrigger != 0)
-            {
-                // TODO: I don't think I'm going to keep this functionality for triggering a trailing stop from a profit target itself (see strategies.json)
-                // move the trade's stop price
-                if (pendingTrade.TradeDirection == TradeDirection.Long)
-                    pendingTrade.StopLoss.OrderPrice += profitTargetOrder.TrailStopTrigger;
-                else
-                    pendingTrade.StopLoss.OrderPrice -= profitTargetOrder.TrailStopTrigger;
-            } else if (this.TrailStopToBreakeven)
+            // check to see if we're trailing the stop to break even
+            if (this.TrailStopToBreakeven)
             {
                 // trail stop to break even
                 pendingTrade.StopLoss.OrderPrice = pendingTrade.InitialEntryPrice;
+            } else if (this.TrailStopToHalfStop)
+            {
+                if (pendingTrade.TradeDirection == TradeDirection.Long)
+                    pendingTrade.StopLoss.OrderPrice = pendingTrade.StopLoss.OrderPrice + (this.InitialStopLoss / 2);
+                else
+                    pendingTrade.StopLoss.OrderPrice = pendingTrade.StopLoss.OrderPrice - (this.InitialStopLoss / 2);
             }
 
             // publish the ProfitTargetHit event
@@ -523,6 +527,10 @@ namespace TradingDataAnalytics.Domain.Strategy
         {
             // reset the strategy status so it can take more trades
             Status = StrategyStatus.OutOfTheMarket;
+
+            // if this trade was closed early after a profit target was hit then it still needs to be counted as a win
+            if (args.ClosedTrade.Profit > 0)
+                args.ClosedTrade.Outcome = TradeOutcome.Win;
 
             TradeClosed?.Invoke(this, args);
         }

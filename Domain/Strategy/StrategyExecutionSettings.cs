@@ -10,6 +10,8 @@
 
         public int TrailStopTrigger { get; set; }
 
+        public bool TrailStopToHalfStop { get; set; }
+
         public List<StrategyProfitTarget> ProfitTargets { get; set; }
     }
 }

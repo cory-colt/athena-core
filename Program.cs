@@ -15,7 +15,7 @@ List<Strategy> strategiesToTest = new List<Strategy>();
 strategiesToTest.Add(new PriceExtremeStrategy());
 
 // setup the strategy engine
-StrategyEngine engine = new StrategyEngine(strategiesConfigFile, candleStickDataFile);
+StrategyEngine engine = new StrategyEngine(strategiesConfigFile, candleStickDataFile, new ConsoleLogger());
 
 // run the engine against all the available strategies
 engine.Run(strategiesToTest);
