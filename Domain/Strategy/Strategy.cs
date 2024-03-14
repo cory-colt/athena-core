@@ -4,13 +4,15 @@ using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using TradingDataAnalytics.Domain.Enums;
-using TradingDataAnalytics.Domain.Events;
-using TradingDataAnalytics.Domain.Helpers;
-using TradingDataAnalytics.Domain.Indicators;
-using TradingDataAnalytics.Domain.Interfaces;
+using Athena.Domain.Models;
+using Athena.Domain.Enums;
+using Athena.Domain.Events;
+using Athena.Domain.Helpers;
+using Athena.Domain.Indicators;
+using Athena.Domain.Interfaces;
+using Athena.Domain.TradeManagement;
 
-namespace TradingDataAnalytics.Domain.Strategy
+namespace Athena.Domain.Strategy
 {
     public abstract class Strategy
     {

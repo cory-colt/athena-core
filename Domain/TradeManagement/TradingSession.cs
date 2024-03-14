@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Athena.Domain.Models;
 
-namespace TradingDataAnalytics.Domain
+namespace Athena.Domain.TradeManagement
 {
     public class TradingSession
     {

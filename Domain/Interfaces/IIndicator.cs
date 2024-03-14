@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using TradingDataAnalytics.Domain;
-using TradingDataAnalytics.Domain.Indicators;
+using Athena.Domain.Models;
+using Athena.Domain.Indicators;
 
-namespace TradingDataAnalytics.Domain.Interfaces
+namespace Athena.Domain.Interfaces
 {
     public interface IIndicator<T>
     {

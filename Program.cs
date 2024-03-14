@@ -1,5 +1,6 @@
-﻿using TradingDataAnalytics.Application;
-using TradingDataAnalytics.Domain.Strategy;
+﻿using Athena.Domain.Strategy;
+using Athena.Application.Logging;
+using Athena.Application.Strategies;
 
 // change the appearance of the console 
 Console.BackgroundColor = ConsoleColor.Gray;

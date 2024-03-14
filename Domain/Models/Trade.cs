@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using TradingDataAnalytics.Domain.Enums;
+using Athena.Domain.Enums;
 
-namespace TradingDataAnalytics.Domain
+namespace Athena.Domain.Models
 {
     public class Trade
     {

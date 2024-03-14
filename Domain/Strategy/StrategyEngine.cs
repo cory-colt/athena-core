@@ -5,10 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using TradingDataAnalytics.Domain.Enums;
-using TradingDataAnalytics.Domain.Interfaces;
+using Athena.Domain.Models;
+using Athena.Domain.Enums;
+using Athena.Domain.Interfaces;
 
-namespace TradingDataAnalytics.Domain.Strategy
+namespace Athena.Domain.Strategy
 {
     public class StrategyEngine
     {
@@ -216,7 +217,7 @@ namespace TradingDataAnalytics.Domain.Strategy
         #endregion
 
         #region event handlers
-        void Strategy_TradeClosed(object? sender, TradingDataAnalytics.Domain.Events.TradeClosedEventArgs e)
+        void Strategy_TradeClosed(object? sender, Athena.Domain.Events.TradeClosedEventArgs e)
         {
             var dateClosed = e.ClosedTrade.Outcome == TradeOutcome.Loss ? e.ClosedTrade.StopLoss?.ClosingDate : e.ClosedTrade.ProfitTargets.Last().ClosingDate;
             var closingPrice = e.ClosedTrade.Outcome == TradeOutcome.Loss ? e.ClosedTrade.StopLoss?.OrderPrice : e.ClosedTrade.ProfitTargets.Last(m => m.ClosingDate != null).OrderPrice;

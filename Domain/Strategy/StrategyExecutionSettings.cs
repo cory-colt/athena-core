@@ -1,4 +1,4 @@
-﻿namespace TradingDataAnalytics.Domain.Strategy
+﻿namespace Athena.Domain.Strategy
 {
     public struct StrategyExecutionSettings
     {

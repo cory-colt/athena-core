@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using TradingDataAnalytics.Domain;
-using TradingDataAnalytics.Domain.Interfaces;
+using Athena.Domain.Models;
+using Athena.Domain.Interfaces;
 
-namespace TradingDataAnalytics.Domain.Indicators
+namespace Athena.Domain.Indicators
 {
     /// <summary>
     /// Exponential Moving Average (EMA) Indicator

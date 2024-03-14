@@ -4,9 +4,10 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using TradingDataAnalytics.Domain;
+using Athena.Domain.Models;
+using Athena.Domain.TradeManagement;
 
-namespace TradingDataAnalytics.Domain.Helpers
+namespace Athena.Domain.Helpers
 {
     public class CandleDataParser
     {

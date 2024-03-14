@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using TradingDataAnalytics.Domain.Enums;
+using Athena.Domain.Enums;
+using Athena.Domain.Models;
 
-namespace TradingDataAnalytics.Domain.Events
+namespace Athena.Domain.Events
 {
     public class ProfitTargetHitEventArgs
     {

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TradingDataAnalytics.Domain.Enums
+namespace Athena.Domain.Enums
 {
     public enum TradeDirection
     {

@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using TradingDataAnalytics.Domain;
-using TradingDataAnalytics.Domain.Enums;
-using TradingDataAnalytics.Domain.Indicators;
-using TradingDataAnalytics.Domain.Interfaces;
-using TradingDataAnalytics.Domain.Strategy;
+using Athena.Domain.Models;
+using Athena.Domain.Enums;
+using Athena.Domain.Indicators;
+using Athena.Domain.Interfaces;
+using Athena.Domain.Strategy;
 
-namespace TradingDataAnalytics.Application
+namespace Athena.Application.Strategies
 {
     public class PriceExtremeStrategy : Strategy
     {
@@ -20,12 +20,12 @@ namespace TradingDataAnalytics.Application
         #region constructors
         public PriceExtremeStrategy() : base()
         {
-            this.EmaIndicators = new Dictionary<int, List<EmaValue>>();
+            EmaIndicators = new Dictionary<int, List<EmaValue>>();
         }
 
         public PriceExtremeStrategy(StrategyConfig config) : base(config)
         {
-            this.EmaIndicators = new Dictionary<int, List<EmaValue>>();
+            EmaIndicators = new Dictionary<int, List<EmaValue>>();
         }
         #endregion
 
@@ -40,7 +40,7 @@ namespace TradingDataAnalytics.Application
             if (Status == StrategyStatus.OutOfTheMarket)
             {
                 // get the 20 EMA value for this same time of day
-                var ema = this.EmaIndicators[20].Where(m => m.TimeOfDay == candle.TimeOfDay).FirstOrDefault();
+                var ema = EmaIndicators[20].Where(m => m.TimeOfDay == candle.TimeOfDay).FirstOrDefault();
 
                 if (ema == null)
                     return false;
@@ -68,8 +68,8 @@ namespace TradingDataAnalytics.Application
             if (Status == StrategyStatus.OutOfTheMarket)
             {
                 // get the 20 EMA value for this same time of day
-                var ema = this.EmaIndicators[20].Where(m => m.TimeOfDay == candle.TimeOfDay).FirstOrDefault();
-                
+                var ema = EmaIndicators[20].Where(m => m.TimeOfDay == candle.TimeOfDay).FirstOrDefault();
+
                 if (ema == null)
                     return false;
 
@@ -89,8 +89,8 @@ namespace TradingDataAnalytics.Application
         {
             var ema = new Ema();
 
-            this.EmaIndicators.Add(10, ema.Calculate(this.Candles, 10).ToList());
-            this.EmaIndicators.Add(20, ema.Calculate(this.Candles, 20).ToList());
+            EmaIndicators.Add(10, ema.Calculate(Candles, 10).ToList());
+            EmaIndicators.Add(20, ema.Calculate(Candles, 20).ToList());
         }
 
         #endregion
@@ -100,8 +100,8 @@ namespace TradingDataAnalytics.Application
         private decimal CalculateEmaPriceChange(CandleStick candle, decimal emaValue)
         {
             var priceChange = candle.Close > emaValue
-                ? Math.Round(((candle.High - emaValue) / emaValue) * 100, 2)
-                : Math.Round(((candle.Low - emaValue) / emaValue) * 100, 2);
+                ? Math.Round((candle.High - emaValue) / emaValue * 100, 2)
+                : Math.Round((candle.Low - emaValue) / emaValue * 100, 2);
 
             return priceChange;
         }

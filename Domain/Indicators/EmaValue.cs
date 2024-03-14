@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TradingDataAnalytics.Domain.Indicators
+namespace Athena.Domain.Indicators
 {
     public record EmaValue
     {

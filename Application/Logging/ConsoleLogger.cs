@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using TradingDataAnalytics.Domain.Interfaces;
+using Athena.Domain.Interfaces;
 
-namespace TradingDataAnalytics.Application
+namespace Athena.Application.Logging
 {
     public class ConsoleLogger : ILogger
     {

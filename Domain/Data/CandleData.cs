@@ -4,10 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Athena.Domain.Interfaces
+namespace Athena.Domain.Data
 {
-    public interface ILogger
+    public class CandleData
     {
-        void Info(string message);
     }
 }
