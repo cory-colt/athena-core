@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Athena.Domain.Models;
 using Athena.Domain.TradeManagement;
 
-namespace Athena.Domain.Helpers
+namespace Athena.Domain.Data
 {
     public class CandleDataParser
     {

@@ -7,15 +7,17 @@ using System.Threading.Tasks;
 using Athena.Domain.Models;
 using Athena.Domain.Enums;
 using Athena.Domain.Events;
-using Athena.Domain.Helpers;
 using Athena.Domain.Indicators;
 using Athena.Domain.Interfaces;
 using Athena.Domain.TradeManagement;
+using Athena.Domain.Data;
 
 namespace Athena.Domain.Strategy
 {
     public abstract class Strategy
     {
+        private readonly ICandleDataProvider _candleDataProvider;
+
         #region public events
         /// <summary>
         /// TradeCreated is fired when a new trade is initially created. See <see cref="TradeCreatedEventArgs"/> for more details.
@@ -78,19 +80,9 @@ namespace Athena.Domain.Strategy
         public TimeOnly TradingWindowEndTime { get; set; }
 
         /// <summary>
-        /// Overall win-rate of the strategy
+        /// Contains the overall running statistics for the strategy's key performance indicators. See <see cref="StrategyStatistics"/> for more info
         /// </summary>
-        public decimal WinRate { get; set; }
-
-        /// <summary>
-        /// Total number of profitable trades
-        /// </summary>
-        public int ProfitableTrades { get; set; }
-
-        /// <summary>
-        /// Total number of losing trades
-        /// </summary>
-        public int LosingTrades { get; set; }
+        public StrategyStatistics Statistics { get; set; } = new StrategyStatistics();
 
         /// <summary>
         /// Number of contracts bought or sold when a trade is executed
@@ -106,16 +98,6 @@ namespace Athena.Domain.Strategy
         /// Sets the initial account balance
         /// </summary>
         public decimal InitialAccountBalance { get; set; }
-
-        /// <summary>
-        /// Total amount of profit made from all the executed trades
-        /// </summary>
-        public decimal TotalProfit { get; set; }
-
-        /// <summary>
-        /// Total amount of losses made from all the executed trades
-        /// </summary>
-        public decimal TotalLosses { get; set; }
 
         /// <summary>
         /// Trades executed for this strategy
@@ -190,8 +172,10 @@ namespace Athena.Domain.Strategy
         /// Instantiates a new Strategy with a <see cref="StrategyConfig"/>
         /// </summary>
         /// <param name="config"><see cref="StrategyConfig"/> object to use when setting all the properties</param>
-        public Strategy(StrategyConfig config) : this()
+        public Strategy(ICandleDataProvider candleDataProvider, StrategyConfig config) : this(candleDataProvider)
         {
+            this._candleDataProvider = candleDataProvider;
+
             StrategyConfig = config;
             Timeframe = config.Timeframe;
             TradingWindowStartTime = new TimeOnly(config.TradingWindowStartTime.Hour, config.TradingWindowStartTime.Minute);
@@ -207,8 +191,10 @@ namespace Athena.Domain.Strategy
         /// <summary>
         /// Default constructor
         /// </summary>
-        public Strategy()
+        public Strategy(ICandleDataProvider candleDataProvider)
         {
+            this._candleDataProvider = candleDataProvider;
+
             Status = StrategyStatus.OutOfTheMarket;
             Trades = new List<Trade>();
         }
@@ -227,11 +213,10 @@ namespace Athena.Domain.Strategy
         ///     </list>
         /// </para>
         /// </summary>
-        /// <param name="rawCandleStickDataLines"></param>
-        public Strategy ParseCandleData(IEnumerable<string> rawCandleStickDataLines)
+        public Strategy ParseCandleData()
         {
-            // convert raw data to 1 minute candlesticks (raw data is a csv of 1 minute candle data)
-            List<CandleStick> candles = CandleDataParser.ConvertRawDataToCandleSticks(rawCandleStickDataLines);
+            // get 1 minute candle data from the candle data provider
+            List<CandleStick> candles = this._candleDataProvider.LoadCandleStickData().ToList();
 
             // convert 1 minute candlesticks into the strategy's timeframe candlesticks
             Candles = CandleDataParser.ConvertCandleTimeframe(candles, Timeframe);
@@ -446,8 +431,8 @@ namespace Athena.Domain.Strategy
             this.AccountBalance += profitAndLoss;
 
             // update the strategy's running total profit and total losses
-            this.TotalProfit += (profitAndLoss > 0) ? profitAndLoss : 0;
-            this.TotalLosses += (profitAndLoss < 0) ? profitAndLoss : 0;
+            this.Statistics.TotalProfit += (profitAndLoss > 0) ? profitAndLoss : 0;
+            this.Statistics.TotalLosses += (profitAndLoss < 0) ? profitAndLoss : 0;
         }
         #endregion
 

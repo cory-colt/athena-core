@@ -13,19 +13,23 @@ namespace Athena.Application.Strategies
 {
     public class PriceExtremeStrategy : Strategy
     {
+        private readonly ICandleDataProvider _candleDataProvider;
+
         #region public properties
         public Dictionary<int, List<EmaValue>> EmaIndicators { get; set; }
         #endregion
 
         #region constructors
-        public PriceExtremeStrategy() : base()
+        public PriceExtremeStrategy(ICandleDataProvider candleDataProvider) : base(candleDataProvider)
         {
-            EmaIndicators = new Dictionary<int, List<EmaValue>>();
+            this.EmaIndicators = new Dictionary<int, List<EmaValue>>();
+            this._candleDataProvider = candleDataProvider;
         }
 
-        public PriceExtremeStrategy(StrategyConfig config) : base(config)
+        public PriceExtremeStrategy(ICandleDataProvider candleDataProvider, StrategyConfig config) : base(candleDataProvider, config)
         {
-            EmaIndicators = new Dictionary<int, List<EmaValue>>();
+            this.EmaIndicators = new Dictionary<int, List<EmaValue>>();
+            this._candleDataProvider = candleDataProvider;
         }
         #endregion
 

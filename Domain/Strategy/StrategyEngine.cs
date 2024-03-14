@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Athena.Domain.Models;
 using Athena.Domain.Enums;
 using Athena.Domain.Interfaces;
+using Athena.Application.Data;
 
 namespace Athena.Domain.Strategy
 {
@@ -66,7 +67,7 @@ namespace Athena.Domain.Strategy
                     // load the strategy configuration, parse the candle data, and load any custom strategy logic
                     strategy
                         .LoadConfiguration(strategyConfig)
-                        .ParseCandleData(rawCandleData)
+                        .ParseCandleData()
                         .LoadCustomStrategyStuff();
 
                     // subscrbe to strategy events
