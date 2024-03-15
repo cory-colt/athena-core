@@ -16,7 +16,7 @@ namespace Athena.Domain.Strategy
 {
     public abstract class Strategy
     {
-        private readonly ICandleDataProvider _candleDataProvider;
+        
 
         #region public events
         /// <summary>
@@ -172,10 +172,8 @@ namespace Athena.Domain.Strategy
         /// Instantiates a new Strategy with a <see cref="StrategyConfig"/>
         /// </summary>
         /// <param name="config"><see cref="StrategyConfig"/> object to use when setting all the properties</param>
-        public Strategy(ICandleDataProvider candleDataProvider, StrategyConfig config) : this(candleDataProvider)
+        public Strategy(StrategyConfig config) : this()
         {
-            this._candleDataProvider = candleDataProvider;
-
             StrategyConfig = config;
             Timeframe = config.Timeframe;
             TradingWindowStartTime = new TimeOnly(config.TradingWindowStartTime.Hour, config.TradingWindowStartTime.Minute);
@@ -191,10 +189,8 @@ namespace Athena.Domain.Strategy
         /// <summary>
         /// Default constructor
         /// </summary>
-        public Strategy(ICandleDataProvider candleDataProvider)
+        public Strategy()
         {
-            this._candleDataProvider = candleDataProvider;
-
             Status = StrategyStatus.OutOfTheMarket;
             Trades = new List<Trade>();
         }
@@ -206,20 +202,19 @@ namespace Athena.Domain.Strategy
         /// <para>
         ///     When the strategy is initialized it will do several things: 
         ///     <list type="bullet">
-        ///         <item>parse all the raw candle data and convert the data into a collection of <see cref="CandleStick"/> objects</item>
-        ///         <item>convert these 1-min candlestick objects into the strategy's respective timeframe's candlesticks</item>
+        ///         <item>convert 1-min candlestick objects into the strategy's respective timeframe's candlesticks</item>
         ///         <item>take the newly converted timeframe candlesticks and filter them based on the trading window's start and end time</item>
         ///         <item>creates dictionary of <see cref="TradingSession"/>'s grouped by date - each trading session has its own respective collection of candlesticks</item>
         ///     </list>
         /// </para>
         /// </summary>
-        public Strategy ParseCandleData()
+        public Strategy ParseCandleData(List<CandleStick> candles)
         {
             // get 1 minute candle data from the candle data provider
-            List<CandleStick> candles = this._candleDataProvider.LoadCandleStickData().ToList();
+            // List<CandleStick> candles = this._candleDataProvider.LoadCandleStickData().ToList();
 
             // convert 1 minute candlesticks into the strategy's timeframe candlesticks
-            Candles = CandleDataParser.ConvertCandleTimeframe(candles, Timeframe);
+            this.Candles = CandleDataParser.ConvertCandleTimeframe(candles, Timeframe);
 
             TimeSpan start = new TimeSpan(TradingWindowStartTime.Hour, TradingWindowStartTime.Minute, 0);
             TimeSpan end = new TimeSpan(TradingWindowEndTime.Hour, 0, 0);
@@ -227,7 +222,7 @@ namespace Athena.Domain.Strategy
             // set the available trading sessions this strategy can use by filtering all the candles to only get those that are within the 
             // specified trading window start/end times
             AvailableSessions = CandleDataParser.SplitCandlesIntoSessions(
-                Candles
+                this.Candles
                     .Where(m => m.TimeOfDay.TimeOfDay >= start && m.TimeOfDay.TimeOfDay <= end)
                     .ToList()
                 );
@@ -469,6 +464,14 @@ namespace Athena.Domain.Strategy
             OnTradeCreated(new TradeCreatedEventArgs { TradeCreated = trade });
         }
 
+        /// <summary>
+        /// This allows derived classes to reset their own session settings when a new session has started
+        /// </summary>
+        public virtual void ResetSessionSettings()
+        {
+            // intentionally left blank incase we n
+        }
+
         #region event handlers
         public virtual void OnTradeCreated(TradeCreatedEventArgs args)
         {
@@ -480,6 +483,8 @@ namespace Athena.Domain.Strategy
 
         public virtual void OnTradeClosed(TradeClosedEventArgs args)
         {
+            this.ResetSessionSettings();
+
             // reset the strategy status so it can take more trades
             Status = StrategyStatus.OutOfTheMarket;
 
@@ -504,7 +509,6 @@ namespace Athena.Domain.Strategy
         #endregion
 
         #region abstract methods
-
         /// <summary>
         /// Determines if the conditions are correct for a short-entry order to be executed
         /// </summary>
@@ -522,7 +526,7 @@ namespace Athena.Domain.Strategy
         /// <summary>
         /// Allows derived classes to implement their own custom logic such as adding moving averages or other indicators
         /// </summary>
-        public abstract void LoadCustomStrategyStuff();
+        public abstract void LoadStrategySpecificSettings();
         #endregion
     }
 }

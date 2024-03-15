@@ -10,6 +10,6 @@ namespace Athena.Domain.Interfaces
 {
     public interface IIndicator<T>
     {
-        IEnumerable<T> Calculate(IEnumerable<CandleStick> candles, int lookbackPeriod);
+        IEnumerable<T> Calculate(IEnumerable<CandleStick> candles);
     }
 }

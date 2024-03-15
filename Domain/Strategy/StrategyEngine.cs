@@ -14,76 +14,60 @@ namespace Athena.Domain.Strategy
 {
     public class StrategyEngine
     {
-        private readonly List<StrategyConfig> _strategyConfigs = new List<StrategyConfig>();
-        private readonly string _candleDataFile = string.Empty;
         private readonly ILogger _logger;
+        private readonly Strategy _strategy;
+        private readonly ICandleDataProvider _candleDataProvider;
+        private readonly IStrategyConfiguration _strategyConfiguration;
 
         #region constructors
         /// <summary>
-        /// Instanties a new <see cref="StrategyEngine"/> by passing in a collection of <see cref="StrategyConfig"/>'s
-        /// </summary>
-        /// <param name="strategyConfigs">Collection of <see cref="StrategyConfig"/> objects</param>
-        /// <param name="candleDataFile">Fully qualified name of the candle data csv file</param>
-        public StrategyEngine(
-            List<StrategyConfig> strategyConfigs, 
-            string candleDataFile, 
-            ILogger logger
-            )
-        {
-            this._strategyConfigs = strategyConfigs;
-            this._candleDataFile = candleDataFile;
-            this._logger = logger;
-        }
-
-        /// <summary>
         /// Instantiates a new <see cref="StrategyEngine"/> by passing in the fully-qualified path to a strategies.json file
         /// </summary>
-        /// <param name="strategyConfigFile">Fully qualified name of the strategies.json configuration file</param>
-        /// <param name="candleDataFile">Fully qualified name of the candle data csv file</param>
+        /// <param name="strategy">Strategy to use for backtesting</param>
+        /// <param name="strategyConfiguration">Strategy configurations to use for backtesting</param>
+        /// <param name="candleDataProvider">Candle data provider used to provide 1-minute <see cref="CandleStick"/> object collection</param>
+        /// <param name="logger">Logging provider to use for logging and instrumentation</param>
         public StrategyEngine(
-            string strategyConfigFile, 
-            string candleDataFile,
+            Strategy strategy, 
+            IStrategyConfiguration strategyConfiguration,
+            ICandleDataProvider candleDataProvider, 
             ILogger logger
             )
         {
-            this._strategyConfigs = LoadStrategyConfigs(strategyConfigFile);
-            this._candleDataFile = candleDataFile;
+            this._strategy = strategy;
+            this._strategyConfiguration = strategyConfiguration;
+            this._candleDataProvider = candleDataProvider;
             this._logger = logger;
         }
         #endregion
 
         #region public methods
-        public void Run(List<Strategy> strategies)
+        public void Run(DateTime? startDate = null, DateTime? endDate = null)
         {
-            // read in the raw candle data from the csv/flat file
-            IEnumerable<string> rawCandleData = File.ReadLines(this._candleDataFile);
+            var configsToTest = this._strategyConfiguration.LoadStrategies();
 
             // iterate over each strategy config
-            foreach (var strategyConfig in this._strategyConfigs)
+            foreach (var strategyConfig in configsToTest)
             {
-                // iterate over the available strategies and load each config to test
-                foreach (var strategy in strategies)
-                {
-                    // load the strategy configuration, parse the candle data, and load any custom strategy logic
-                    strategy
-                        .LoadConfiguration(strategyConfig)
-                        .ParseCandleData()
-                        .LoadCustomStrategyStuff();
+                // load the strategy configuration, parse the candle data, and load any custom strategy logic
+                this._strategy
+                    .LoadConfiguration(strategyConfig)
+                    .ParseCandleData(this._candleDataProvider.LoadCandleStickData(startDate, endDate).ToList())
+                    .LoadStrategySpecificSettings();
 
-                    // subscrbe to strategy events
-                    strategy.TradeClosed += Strategy_TradeClosed;
-                    strategy.TradeCreated += Strategy_TradeCreated;
-                    strategy.ProfitTargetHit += Strategy_ProfitTargetHit;
-                    strategy.StopLossHit += Strategy_StopLossHit;
+                // subscrbe to strategy events
+                this._strategy.TradeClosed += Strategy_TradeClosed;
+                this._strategy.TradeCreated += Strategy_TradeCreated;
+                this._strategy.ProfitTargetHit += Strategy_ProfitTargetHit;
+                this._strategy.StopLossHit += Strategy_StopLossHit;
 
-                    StartLookingForTradeOpportunities(strategy);
-                    
-                    // unsubscribe from the events
-                    strategy.TradeClosed -= Strategy_TradeClosed;
-                    strategy.TradeCreated -= Strategy_TradeCreated;
-                    strategy.ProfitTargetHit -= Strategy_ProfitTargetHit;
-                    strategy.StopLossHit -= Strategy_StopLossHit;
-                }
+                StartLookingForTradeOpportunities(this._strategy);
+
+                // unsubscribe from the events
+                this._strategy.TradeClosed -= Strategy_TradeClosed;
+                this._strategy.TradeCreated -= Strategy_TradeCreated;
+                this._strategy.ProfitTargetHit -= Strategy_ProfitTargetHit;
+                this._strategy.StopLossHit -= Strategy_StopLossHit;
             }            
         }
 
@@ -100,6 +84,9 @@ namespace Athena.Domain.Strategy
             foreach (var session in strategy.AvailableSessions)
             {
                 var sessionTradeCount = 0;
+
+                // reset any session settings prior to testing the session
+                strategy.ResetSessionSettings();
 
                 // iterate over the session's candles
                 foreach (var candle in session.Value.Candles)
@@ -176,25 +163,9 @@ namespace Athena.Domain.Strategy
             return tradeToExecute;
         }
 
-        /// <summary>
-        /// Reads the strategies.json file and deserializes it into a collection of <see cref="StrategyConfig"/> objects
-        /// </summary>
-        /// <param name="configFile">Fully qualified name of the strategies.json file</param>
-        /// <returns>Deserialized collection of <see cref="StrategyConfig"/> objects</returns>
-        private List<StrategyConfig> LoadStrategyConfigs(string configFile)
-        {
-            using (StreamReader r = new StreamReader(configFile))
-            {
-                string json = r.ReadToEnd();
-                var configs = JsonSerializer.Deserialize<List<StrategyConfig>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                return configs;
-            }
-        }
-
         private void WriteStrategyHeaderToLogger(Strategy strategy)
         {
-            _logger.Info($"Executing Strategy: [{strategy.Name}] - Starting Account Balance: [{strategy.AccountBalance}]");
+            _logger.Info($"Executing Strategy: [{strategy.Name}] - Starting Account Balance: [{string.Format("{0:C}", strategy.AccountBalance)}]");
             _logger.Info("------------------------------------------------------------------------------------------------------------------------------------------------");
             _logger.Info(string.Format("{0, 12} | {1, 25} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12} | {7, 12}", "Id", "Date", "Direction", "Entry Price", "Closing Price", "P/L", "Outcome", "Account Balance"));
             _logger.Info("------------------------------------------------------------------------------------------------------------------------------------------------");
@@ -229,7 +200,7 @@ namespace Athena.Domain.Strategy
                 "-",
                 "-",
                 closingPrice,
-                "-", // string.Format("{0:C}", e.ClosedTrade.Profit),
+                "-", 
                 e.ClosedTrade.Outcome, 
                 string.Format("{0:C}", e.NewAccountBalance)));
         }

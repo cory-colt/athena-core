@@ -1,29 +1,36 @@
-﻿using System;
+﻿using Athena.Domain.Enums;
+using Athena.Domain.Indicators;
+using Athena.Domain.Models;
+using Athena.Domain.Strategy;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
-using Athena.Domain.Models;
-using Athena.Domain.Enums;
-using Athena.Domain.Indicators;
-using Athena.Domain.Interfaces;
-using Athena.Domain.Strategy;
 
 namespace Athena.Application.Strategies
 {
-    public class PriceExtremeStrategy : Strategy
+    public class EnterAfterPriceExtremeAndEmaCloseStrategy : Strategy
     {
+        private const decimal price_change_short_extreme = -.25m;
+        private const decimal price_change_long_extreme = .25m;
+        private const int emaCloseThreshold = 5;
+
+        private bool _isLongExtreme = false;
+        private bool _isShortExtreme = false;
+
         #region public properties
         public Dictionary<int, List<EmaValue>> EmaIndicators { get; set; }
         #endregion
 
         #region constructors
-        public PriceExtremeStrategy() : base()
+        public EnterAfterPriceExtremeAndEmaCloseStrategy() : base()
         {
             this.EmaIndicators = new Dictionary<int, List<EmaValue>>();
         }
 
-        public PriceExtremeStrategy(StrategyConfig config) : base(config)
+        public EnterAfterPriceExtremeAndEmaCloseStrategy(StrategyConfig config) : base(config)
         {
             this.EmaIndicators = new Dictionary<int, List<EmaValue>>();
         }
@@ -41,15 +48,24 @@ namespace Athena.Application.Strategies
             {
                 // get the 20 EMA value for this same time of day
                 var ema = EmaIndicators[20].Where(m => m.TimeOfDay == candle.TimeOfDay).FirstOrDefault();
+                var ema10 = EmaIndicators[10].Where(m => m.TimeOfDay == candle.TimeOfDay).FirstOrDefault();
 
                 if (ema == null)
                     return false;
 
                 var priceChange = CalculateEmaPriceChange(candle, ema.Value);
 
-                // TODO: this price change amount should not be hard-coded
-                if (priceChange < 0 && priceChange <= -.25m)
+                if (priceChange < 0 && priceChange <= price_change_short_extreme && !this._isLongExtreme)
                 {
+                    this._isLongExtreme = true;
+                }
+
+                var yep = candle.Close - ema10.Value;
+                if (this._isLongExtreme && (candle.Close - ema10.Value) >= emaCloseThreshold)
+                {
+                    // reset this flag
+                    this._isLongExtreme = false;
+
                     return true;
                 }
             }
@@ -69,20 +85,37 @@ namespace Athena.Application.Strategies
             {
                 // get the 20 EMA value for this same time of day
                 var ema = EmaIndicators[20].Where(m => m.TimeOfDay == candle.TimeOfDay).FirstOrDefault();
+                var ema10 = EmaIndicators[10].Where(m => m.TimeOfDay == candle.TimeOfDay).FirstOrDefault();
 
                 if (ema == null)
                     return false;
 
                 var priceChange = CalculateEmaPriceChange(candle, ema.Value);
 
-                // TODO: this price change amount should not be hard-coded
-                if (priceChange > 0 && priceChange >= .25m)
+                if (priceChange > 0 && priceChange >= price_change_long_extreme && !this._isShortExtreme)
                 {
+                    this._isShortExtreme = true;
+                }
+
+                if (this._isShortExtreme && (ema10.Value - candle.Close) >= emaCloseThreshold)
+                {
+                    // reset this flag
+                    this._isShortExtreme = false;
+
                     return true;
                 }
             }
 
             return false;
+        }
+
+        public override void ResetSessionSettings()
+        {
+            // when a new session starts make sure to reset these settings
+            this._isShortExtreme = false;
+            this._isLongExtreme = false;
+
+            base.ResetSessionSettings();
         }
 
         /// <summary>
@@ -109,7 +142,6 @@ namespace Athena.Application.Strategies
 
             return priceChange;
         }
-
         #endregion
     }
 }

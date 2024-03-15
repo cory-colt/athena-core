@@ -25,13 +25,21 @@ namespace Athena.Application.Data
         /// </para>
         /// </summary>
         /// <returns>Collection of <see cref="CandleStick"/> objects</returns>
-        public IEnumerable<CandleStick> LoadCandleStickData()
+        public IEnumerable<CandleStick> LoadCandleStickData(DateTime? startDate = null, DateTime? endDate = null)
         {
             // read in the raw candle data from the csv/flat file
             IEnumerable<string> rawCandleData = File.ReadLines(this._csvFile);
 
             // convert raw data to 1 minute candlesticks (raw data is a csv of 1 minute candle data)
             List<CandleStick> candles = CandleDataParser.ConvertRawDataToCandleSticks(rawCandleData);
+
+            // filter by starting date
+            if (startDate != null)
+                candles = candles.Where(m => m.TimeOfDay >= startDate).ToList();
+
+            // filter by ending date
+            if (endDate != null)
+                candles = candles.Where(m => m.TimeOfDay < endDate?.AddDays(1)).ToList();
 
             return candles;
         }

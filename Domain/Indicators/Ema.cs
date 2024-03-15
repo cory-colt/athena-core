@@ -13,17 +13,24 @@ namespace Athena.Domain.Indicators
     /// </summary>
     public class Ema : IIndicator<EmaValue>
     {
+        private int _lookbackPeriod { get; set; }
+
+        public Ema(int lookbackPeriod)
+        {
+            this._lookbackPeriod = lookbackPeriod;
+        }
+        
         /// <summary>
         /// Calculates an Exponential Moving Average (EMA) from a collection of <see cref="CandleStick"/> objects given a specific lookback period
         /// </summary>
         /// <param name="candles">Collection of <see cref="CandleStick"/> objects</param>
         /// <param name="lookbackPeriod">Lookback period to use for calculating the EMA. (ex. 20 = 20 period EMA)</param>
         /// <returns>Collection of <see cref="EmaValue"/> objects that associates the time of day (candle) with its corresponding EMA value</returns>
-        public IEnumerable<EmaValue> Calculate(IEnumerable<CandleStick> candles, int lookbackPeriod)
+        public IEnumerable<EmaValue> Calculate(IEnumerable<CandleStick> candles)
         {
             List<EmaValue> emaValues = new List<EmaValue>();
 
-            var multiplier = 2 / (decimal)(lookbackPeriod + 1);
+            var multiplier = 2 / (decimal)(this._lookbackPeriod + 1);
             var candlesToEvaluate = candles.ToArray();
             decimal result = 0;
 

@@ -9,15 +9,21 @@ Console.Clear();
 Console.ForegroundColor = ConsoleColor.Black;
 
 
-var candleStickDataFile = Path.Combine(@"I:\Windows Projects\athena-core", "market-data-sample.txt");
-var strategiesConfigFile = Path.Combine(@"I:\Windows Projects\athena-core", "strategies.json");
-
-// setup the strategies that will be tested
-List<Strategy> strategiesToTest = new List<Strategy>();
-strategiesToTest.Add(new PriceExtremeStrategy(new CsvCandleDataProvider()));
+// setup the strategy engine
+//StrategyEngine engine = new StrategyEngine(
+//    new PriceExtremeStrategy(), 
+//    new JsonStrategyConfiguration(), 
+//    new CsvCandleDataProvider(), 
+//    new ConsoleLogger());
 
 // setup the strategy engine
-StrategyEngine engine = new StrategyEngine(strategiesConfigFile, candleStickDataFile, new ConsoleLogger());
+StrategyEngine engine = new StrategyEngine(
+    new EnterAfterPriceExtremeAndEmaCloseStrategy(),
+    new JsonStrategyConfiguration(),
+    new CsvCandleDataProvider(),
+    new ConsoleLogger());
 
 // run the engine against all the available strategies
-engine.Run(strategiesToTest);
+var startDate = DateTime.Parse("2/12/2024");
+var endDate = DateTime.Parse("2/29/2024");
+engine.Run(startDate);
