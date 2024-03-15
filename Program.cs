@@ -16,6 +16,8 @@ StrategyEngine engine = new StrategyEngine(
     new ConsoleLogger());
 
 // run the engine against all the available strategies
-var startDate = DateTime.Parse("1/1/2024");
+var startDate = DateTime.Parse("3/1/2024");
 var endDate = DateTime.Parse("3/8/2024");
-engine.Run(startDate, endDate);
+engine.Run();
+
+Console.ReadLine();

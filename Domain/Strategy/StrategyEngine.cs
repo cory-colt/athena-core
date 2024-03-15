@@ -9,6 +9,7 @@ using Athena.Domain.Models;
 using Athena.Domain.Enums;
 using Athena.Domain.Interfaces;
 using Athena.Application.Data;
+using System.Numerics;
 
 namespace Athena.Domain.Strategy
 {
@@ -157,7 +158,6 @@ namespace Athena.Domain.Strategy
                         Contracts = m.Contracts,
                         OrderPrice = (direction == TradeDirection.Long) ? candle.Close + m.ProfitTarget : candle.Close - m.ProfitTarget,
                         OpeningDate = candle.TimeOfDay,
-                        TrailStopTrigger = m.Stop, 
                         OrderDirection = (direction == TradeDirection.Long) ? TradeDirection.Long : TradeDirection.Short
                     })
                     .ToList()
@@ -177,17 +177,51 @@ namespace Athena.Domain.Strategy
         private void WriteSummaryToLogger(Strategy strategy)
         {
             var gainOnAccount = strategy.AccountBalance - strategy.InitialAccountBalance;
-
-            _logger.Info($"---------------------- STRATEGY SUMMARY STATISTICS --------------------------");
-            _logger.Info("\n");
-
-            _logger.Info($"Gain on Account: {string.Format("{0:C}", gainOnAccount)} ({(strategy.AccountBalance - strategy.InitialAccountBalance) / strategy.InitialAccountBalance * 100}%) - Total Trades: {strategy.Trades.Count}");
+            var goaString = $"({(strategy.AccountBalance - strategy.InitialAccountBalance) / strategy.InitialAccountBalance * 100}%)";
             var losses = Convert.ToDecimal(strategy.Trades.Where(m => m.Outcome == TradeOutcome.Loss).Count());
             var wins = Convert.ToDecimal(strategy.Trades.Where(m => m.Outcome == TradeOutcome.Win).Count());
             var totalTrades = Convert.ToDecimal(strategy.Trades.Count);
             var winRate = Convert.ToDecimal(wins / totalTrades * 100);
-            _logger.Info(string.Format("{0,10} | {1,10} | {2, 10}", "Wins", "Losses", "Win-Rate"));
-            _logger.Info(string.Format("{0,10} | {1,10} | {2, 10}%", wins, losses, winRate.ToString("0.00")));
+
+            _logger.Info("\n");
+            _logger.Info($"----------------------------------------------- STRATEGY SUMMARY STATISTICS ---------------------------------------------------");
+            _logger.Info($"-------------------------------------------------------------------------------------------------------------------------------");
+            _logger.Info(string.Format("{0, 30} | {1, 12} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}",
+                "Gain On Account",
+                "Total Trades",
+                "Wins",
+                "Losses",
+                "Total Profit",
+                "Total Losses",
+                "Win-Rate"
+            ));
+            _logger.Info($"-------------------------------------------------------------------------------------------------------------------------------");            
+
+            _logger.Info(string.Format("{0, 30} | {1, 12} | {2, 12} | {3, 12} | {4, 12} | {5, 12} | {6, 12}%",
+                string.Format("{0:C}, {1}", gainOnAccount, goaString), 
+                strategy.Trades?.Count,
+                wins,
+                losses,
+                string.Format("{0:C}", strategy.Statistics.TotalProfit),
+                string.Format("{0:C}", strategy.Statistics.TotalLosses),
+                winRate.ToString("0.00")
+            ));
+
+            _logger.Info("\n");
+            _logger.Info("--------------------------------------");
+            _logger.Info("Strategy Details: ");
+            _logger.Info("--------------------------------------");
+            _logger.Info($"Contracts: {strategy.Contracts}");
+            _logger.Info($"Stop Trading After Winning: {strategy.StopTradingAfterWinning}");
+            _logger.Info($"Max Trades Per Session: {strategy.MaxTradesPerSession}");
+            _logger.Info($"Trail Stop to Breakeven: {strategy.TrailStopToBreakeven}");
+            _logger.Info($"Trail Stop to Half: {strategy.TrailStopToHalfStop}");
+            _logger.Info($"Initial Stop Loss: {strategy.InitialStopLoss}");
+            _logger.Info($"Profit Targets: ({strategy.ProfitTargets.Count}) ");
+            foreach (var pt in strategy.ProfitTargets)
+            {
+                _logger.Info($"- {pt.ProfitTarget} (risk-to-reward: 1:{Convert.ToDecimal(pt.ProfitTarget / strategy.InitialStopLoss).ToString("#.##")})");
+            }
         }
         #endregion
 

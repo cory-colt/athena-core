@@ -259,7 +259,6 @@ namespace Athena.Domain.Strategy
             this.StopTradingAfterWinning = config.StopTradingAfterWinning;
             this.TrailStopToBreakeven = config.ExecutionSettings.TrailStopToBreakeven;
             this.TrailStopToHalfStop = config.ExecutionSettings.TrailStopToHalfStop;
-            this.TrailStopTrigger = config.ExecutionSettings.TrailStopTrigger;
             this.ProfitTargets = config.ExecutionSettings.ProfitTargets;
             this.TradingWindowEndTime = new TimeOnly(config.TradingWindowEndTime.Hour + 2, config.TradingWindowEndTime.Minute); // + 2 is because the candle data is in EST, not MST
             this.TradingWindowStartTime = new TimeOnly(config.TradingWindowStartTime.Hour + 2, config.TradingWindowStartTime.Minute); // + 2 is because the candle data is in EST, not MST

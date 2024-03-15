@@ -29,17 +29,10 @@
       "initialStopLoss": 30,
       "trailStopToBreakeven": true,
       "trailStopToHalfStop": false,
-      "trailStopTrigger": 20,
       "profitTargets": [
         {
-          "profitTarget": 20,
-          "contracts": 5,
-          "stop": 0
-        },
-        {
-          "profitTarget": 40,
-          "contracts": 5,
-          "stop": 0
+          "profitTarget": 30,
+          "contracts": 10
         }
       ]
     }
