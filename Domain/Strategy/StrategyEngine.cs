@@ -97,13 +97,16 @@ namespace Athena.Domain.Strategy
                         strategy.CheckOpenPosition(candle);
                     }
 
+                    // check to make sure we're still inside the allowable time window for when new trades can be entered
+                    var isInsideNewOrderAllowedWindow = TimeOnly.FromDateTime(candle.TimeOfDay) <= strategy.AllowedOrderEntryWindowEndTime;
+
                     // check if there are any trades, if so see if they're a winning trade so we can exit this session without taking any additional trades
                     if (strategy.StopTradingAfterWinning)
                         if (strategy.Trades?.Where(m => m.Outcome == TradeOutcome.Win && m.DateInitiated.ToShortDateString() == session.Key).Count() > 0)
                             break;
 
                     // we're out of the market - check for long entry conditions
-                    if (strategy.LongEntryCondition(candle) && sessionTradeCount < strategy.MaxTradesPerSession)
+                    if (strategy.LongEntryCondition(candle) && sessionTradeCount < strategy.MaxTradesPerSession && isInsideNewOrderAllowedWindow)
                     {
                         var longTrade = CreateTrade(candle, strategy, TradeDirection.Long);
 
@@ -113,7 +116,7 @@ namespace Athena.Domain.Strategy
                         sessionTradeCount++;
                     }
 
-                    if (strategy.ShortEntryCondition(candle) && sessionTradeCount < strategy.MaxTradesPerSession)
+                    if (strategy.ShortEntryCondition(candle) && sessionTradeCount < strategy.MaxTradesPerSession && isInsideNewOrderAllowedWindow)
                     {
                         // setup the short trade
                         var shortTrade = CreateTrade(candle, strategy, TradeDirection.Short);

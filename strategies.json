@@ -10,17 +10,25 @@
       "minute": 30
     },
     "tradingWindowEndTime": {
-      "hour": 9,
+      "hour": 14,
       "minute": 0
     },
     "startingAccountBalance": 1000,
-    "maxTradesPerSession": 3,
+    "maxTradesPerSession": 1,
     "stopTradingAfterWinning": true,
     "executionSettings": {
+      "allowedOrderEntryWindowStartTime": {
+        "hour": 7,
+        "minute": 30
+      },
+      "allowedOrderEntryWindowEndTime": {
+        "hour": 9,
+        "minute": 0
+      },
       "contracts": 10,
       "initialStopLoss": 30,
       "trailStopToBreakeven": true,
-      "trailStopToHalfStop":  false, 
+      "trailStopToHalfStop": false,
       "trailStopTrigger": 20,
       "profitTargets": [
         {

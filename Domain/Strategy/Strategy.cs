@@ -70,14 +70,30 @@ namespace Athena.Domain.Strategy
         public int Timeframe { get; set; }
 
         /// <summary>
-        /// Starting time for the trade execution window. This is a window of time when trades are allowed to be executed during any given session
+        /// Starting time for the trading window. This is the beginning of when trade logic will begin to start looking for trade entries.
         /// </summary>
         public TimeOnly TradingWindowStartTime { get; set; }
 
         /// <summary>
-        /// Ending time for the trade execution window. This is a window of time when trades are allowed to be executed during any given session
+        /// Ending time for the trading window. This is the end time for the session. Any existing trades will be automatically closed at this time.
         /// </summary>
         public TimeOnly TradingWindowEndTime { get; set; }
+
+        /// <summary>
+        /// Determines the starting time of when new order entries are allowed to be executed - this is only applicable when there are currently no pending trades
+        /// <para>
+        ///     The allowed order entry start/end windows are here to determine when new order entries are able to be placed within the strategy's trading window
+        /// </para>
+        /// </summary>
+        public TimeOnly AllowedOrderEntryWindowStartTime { get; set; }
+
+        /// <summary>
+        /// Determines the ending time of when new order entries are allowed to be executed - no new orders (except for closing existing orders) will be allowed after this time
+        /// <para>
+        ///     The allowed order entry start/end windows are here to determine when new order entries are able to be placed within the strategy's trading window
+        /// </para>
+        /// </summary>
+        public TimeOnly AllowedOrderEntryWindowEndTime { get; set; }
 
         /// <summary>
         /// Contains the overall running statistics for the strategy's key performance indicators. See <see cref="StrategyStatistics"/> for more info
@@ -210,18 +226,17 @@ namespace Athena.Domain.Strategy
         /// </summary>
         public Strategy ParseCandleData(List<CandleStick> candles)
         {
-            // get 1 minute candle data from the candle data provider
-            // List<CandleStick> candles = this._candleDataProvider.LoadCandleStickData().ToList();
+            // convert 1 minute candlesticks into the strategy's timeframe candlesticks, this is so the strategy will always have access to the original
+            // collection of timeframe-specific candles that have NOT been split into individual sessions
+            this.Candles = CandleDataProcessor.ConvertCandleTimeframe(candles, Timeframe);
 
-            // convert 1 minute candlesticks into the strategy's timeframe candlesticks
-            this.Candles = CandleDataParser.ConvertCandleTimeframe(candles, Timeframe);
-
+            // set the trading session start and end time - used split the candles into only candles that are within this trading window
             TimeSpan start = new TimeSpan(TradingWindowStartTime.Hour, TradingWindowStartTime.Minute, 0);
             TimeSpan end = new TimeSpan(TradingWindowEndTime.Hour, 0, 0);
 
             // set the available trading sessions this strategy can use by filtering all the candles to only get those that are within the 
             // specified trading window start/end times
-            AvailableSessions = CandleDataParser.SplitCandlesIntoSessions(
+            AvailableSessions = CandleDataProcessor.SplitCandlesIntoSessions(
                 this.Candles
                     .Where(m => m.TimeOfDay.TimeOfDay >= start && m.TimeOfDay.TimeOfDay <= end)
                     .ToList()
@@ -250,6 +265,8 @@ namespace Athena.Domain.Strategy
             this.ProfitTargets = config.ExecutionSettings.ProfitTargets;
             this.TradingWindowEndTime = new TimeOnly(config.TradingWindowEndTime.Hour + 2, config.TradingWindowEndTime.Minute); // + 2 is because the candle data is in EST, not MST
             this.TradingWindowStartTime = new TimeOnly(config.TradingWindowStartTime.Hour + 2, config.TradingWindowStartTime.Minute); // + 2 is because the candle data is in EST, not MST
+            this.AllowedOrderEntryWindowStartTime = new TimeOnly(config.ExecutionSettings.AllowedOrderEntryWindowStartTime.Hour + 2, config.ExecutionSettings.AllowedOrderEntryWindowStartTime.Minute); // + 2 is because the candle data is in EST, not MST
+            this.AllowedOrderEntryWindowEndTime = new TimeOnly(config.ExecutionSettings.AllowedOrderEntryWindowEndTime.Hour + 2, config.ExecutionSettings.AllowedOrderEntryWindowEndTime.Minute); // + 2 is because the candle data is in EST, not MST
 
             return this;
         }

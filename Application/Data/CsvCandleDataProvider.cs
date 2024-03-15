@@ -31,7 +31,7 @@ namespace Athena.Application.Data
             IEnumerable<string> rawCandleData = File.ReadLines(this._csvFile);
 
             // convert raw data to 1 minute candlesticks (raw data is a csv of 1 minute candle data)
-            List<CandleStick> candles = CandleDataParser.ConvertRawDataToCandleSticks(rawCandleData);
+            List<CandleStick> candles = CandleDataProcessor.ConvertRawDataToCandleSticks(rawCandleData);
 
             // filter by starting date
             if (startDate != null)
