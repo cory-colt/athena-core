@@ -32,7 +32,7 @@
       "trailStopTrigger": 20,
       "profitTargets": [
         {
-          "profitTarget": 30,
+          "profitTarget": 20,
           "contracts": 5,
           "stop": 0
         },

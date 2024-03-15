@@ -41,7 +41,7 @@ namespace Athena.Domain.Data
                     candle.Close = Convert.ToDecimal(split[4]);
                     candle.Volume = Convert.ToDecimal(split[5]);
 
-                    // do not add data for Sundays
+                    // do not add data for Sundays because it throws everything off
                     if (candle.TimeOfDay.DayOfWeek.ToString().ToLower() != "sunday")
                     {
                         // add the candle to the collection
@@ -64,36 +64,48 @@ namespace Athena.Domain.Data
         }
 
         /// <summary>
-        /// Converts 1-min candles to some other timeframe
+        /// Converts 1-min candles into some other timeframe (i.e. 2 minute, 3 minute, 5 minute, etc..)
         /// </summary>
         /// <param name="candles">Collection of 1-min <see cref="CandleStick"/> objects to be converted to a different timeframe</param>
         /// <param name="timeframeMinutes">Timeframe, in minutes, to convert the 1-min candles to</param>
         /// <returns>Collection of <see cref="CandleStick"/> objects that represent the new timeframe</returns>
         public static List<CandleStick> ConvertCandleTimeframe(List<CandleStick> candles, int timeframeMinutes = 1)
         {
-            List<CandleStick> newCandles = new List<CandleStick>();
+            // first convert the 1 minute candles into their respective sessions - this is so converting the candles to the timeframe can start at midnight for every session
+            // without doing this it was causing a bug for days that didn't have the expected candles (friday's, holidays, sundays) to throw off the timing
+            Dictionary<string, TradingSession> sessions = SplitCandlesIntoSessions(candles);
 
-            int skipCounter = 0;
+            // the converted timeframe candles will be stored here
+            List<CandleStick> timeframeCandles = new List<CandleStick>();
 
-            do
+            // iterate over each session and convert them into the requested timeframe
+            foreach (var session in sessions)
             {
-                var workingCandles = candles.Skip(skipCounter).Take(timeframeMinutes).ToList();
+                var sessionCandles = session.Value.Candles;
+                
+                // this has to reset at 0 for every session otherwise it will mess up the count and throw off the statistics
+                int skipCounter = 0;
 
-                newCandles.Add(new CandleStick
+                do
                 {
-                    Volume = workingCandles.Sum(m => m.Volume),
-                    Open = workingCandles.First().Open,
-                    High = workingCandles.Max(m => m.High),
-                    Low = workingCandles.Min(m => m.Low),
-                    Close = workingCandles.Last().Close,
-                    TimeOfDay = workingCandles.First().TimeOfDay
-                });
+                    var workingCandles = sessionCandles.Skip(skipCounter).Take(timeframeMinutes).ToList();
 
-                skipCounter += timeframeMinutes;
-            }
-            while (skipCounter < candles.Count);
+                    timeframeCandles.Add(new CandleStick
+                    {
+                        Volume = workingCandles.Sum(m => m.Volume),
+                        Open = workingCandles.First().Open,
+                        High = workingCandles.Max(m => m.High),
+                        Low = workingCandles.Min(m => m.Low),
+                        Close = workingCandles.Last().Close,
+                        TimeOfDay = workingCandles.First().TimeOfDay
+                    });
 
-            return newCandles;
+                    skipCounter += timeframeMinutes;
+                }
+                while (skipCounter < sessionCandles.Count);
+            }            
+
+            return timeframeCandles;
         }
 
         /// <summary>

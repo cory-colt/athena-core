@@ -16,8 +16,6 @@ namespace Athena.Domain.Strategy
 {
     public abstract class Strategy
     {
-        
-
         #region public events
         /// <summary>
         /// TradeCreated is fired when a new trade is initially created. See <see cref="TradeCreatedEventArgs"/> for more details.
