@@ -149,11 +149,6 @@ namespace Athena.Domain.Strategy
         public bool TrailStopToHalfStop { get; set; } = false;
 
         /// <summary>
-        /// Trigger price (in points) for when the stop should be moved to breakeven. This only works if TrailStopToBreakEven = true
-        /// </summary>
-        public int TrailStopTrigger { get; set; }
-
-        /// <summary>
         /// Collection of profit targets used for scaling out of a trade. See <see cref="StrategyProfitTarget"/> for more details
         /// <para>
         ///     Each profit target is comprised of an exit price, number of contracts to be closed at this price, 
@@ -190,14 +185,14 @@ namespace Athena.Domain.Strategy
         {
             StrategyConfig = config;
             Timeframe = config.Timeframe;
-            TradingWindowStartTime = new TimeOnly(config.TradingWindowStartTime.Hour, config.TradingWindowStartTime.Minute);
-            TradingWindowEndTime = new TimeOnly(config.TradingWindowEndTime.Hour, config.TradingWindowEndTime.Minute); ;
+            PricePerTick = config.PricePerTick;
             Contracts = config.ExecutionSettings.Contracts;
             AccountBalance = config.StartingAccountBalance;
-            InitialAccountBalance = config.StartingAccountBalance;
-            PricePerTick = config.PricePerTick;
-            InitialStopLoss = config.ExecutionSettings.InitialStopLoss;
             MaxTradesPerSession = config.MaxTradesPerSession;
+            InitialAccountBalance = config.StartingAccountBalance;
+            InitialStopLoss = config.ExecutionSettings.InitialStopLoss;
+            TradingWindowStartTime = new TimeOnly(config.TradingWindowStartTime.Hour, config.TradingWindowStartTime.Minute);
+            TradingWindowEndTime = new TimeOnly(config.TradingWindowEndTime.Hour, config.TradingWindowEndTime.Minute);
         }
 
         /// <summary>
